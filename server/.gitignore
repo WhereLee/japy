@@ -1,0 +1,35 @@
+# ===== 构建产物 =====
+target/
+frontend/dist/
+
+# ===== 依赖 =====
+frontend/node_modules/
+
+# ===== IDE / 编辑器 =====
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+*.swp
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+
+# ===== 日志 =====
+logs/
+*.log
+
+# ===== 工具元数据 =====
+.reasonix/
+
+# ===== 小说数据文件（大文本，运行时扫描导入，不入库）=====
+novels/*.txt
+
+# ===== 测试结果产物（脚本保留，报告不入库）=====
+scripts/full-endpoint-timing.txt
+
+# ===== 环境变量 / 密钥 =====
+.env

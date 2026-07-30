@@ -1,0 +1,127 @@
+server:
+  port: 8081
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 1024
+  # 优雅停机：收到关闭信号后停止接收新请求，等待已有请求处理完成
+  shutdown: graceful
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/recloud?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: ${DB_PASSWORD:root}
+    hikari:
+      maximum-pool-size: 20        # 最大连接数，中小项目 20 足够
+      minimum-idle: 10             # 最小空闲连接，保持一定预热
+      connection-timeout: 5000     # 获取连接超时 5s
+      idle-timeout: 300000         # 空闲连接存活 5min
+      max-lifetime: 1800000        # 连接最大存活 30min（MySQL wait_timeout 默认 8h，远小于即可）
+      pool-name: RecloudHikariPool
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+  # Redis（Lettuce 客户端，默认连接池）
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      lettuce:
+        pool:
+          max-active: 32
+          max-idle: 16
+          min-idle: 4
+          max-wait: 200ms
+        shutdown-timeout: 200ms
+
+  # 文件上传限制
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+  # 优雅停机等待时间
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+# MyBatis-Plus
+mybatis-plus:
+  # XML 映射文件位置（复杂联表查询用 XML，简单 CRUD 用 BaseMapper/注解）
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+# JWT 配置
+jwt:
+  # Base64 编码的密钥（至少 256 位 / 32 字节）
+  secret: ${JWT_SECRET:cmVjbG91ZC1qd3Qtc2VjcmV0LWtleS1mb3ItZGV2ZWxvcG1lbnQtc29tZXRoaW5n}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:1800000}     # 30 分钟
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7 天
+
+# 小说文件目录
+novel:
+  txt-dir: ./novels
+
+# Knife4j API 文档
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+# CORS
+app:
+  cors:
+    # 允许的来源模式（逗号分隔，支持通配符）；生产环境通过 CORS_ORIGINS 环境变量指定明确域名
+    allowed-origins: "${CORS_ORIGINS:http://localhost:*,http://127.0.0.1:*}"
+
+# RocketMQ
+rocketmq:
+  name-server: ${ROCKETMQ_NAMESRV:localhost:9876}
+  producer:
+    group: recloud-producer-group
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 2
+  # 操作日志消费者开关（条件装配：缺失时消费者 Bean 不创建，日志只发不消费、无法入库）
+  consumer:
+    enabled: true
+
+# Actuator 健康检查 + Micrometer 指标收集
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+  metrics:
+    tags:
+      application: recloud
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+      sla:
+        http.server.requests: 100ms, 200ms, 500ms, 1s
+
+# Logging
+logging:
+  file:
+    name: logs/recloud.log
+  level:
+    com.recloud: debug
