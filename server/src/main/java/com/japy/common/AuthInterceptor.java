@@ -53,7 +53,14 @@ public class AuthInterceptor implements HandlerInterceptor {
                 response.getWriter().write("{\"code\":403,\"msg\":\"账号已被封禁\"}");
                 return false;
             }
-            UserContext.set(userId, nickname);
+            // 管理端路径需要 admin 角色
+            if (path.startsWith("/api/admin/") && !"admin".equals(user.getRole())) {
+                response.setStatus(403);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":403,\"msg\":\"需要管理员权限\"}");
+                return false;
+            }
+            UserContext.set(userId, nickname, user.getRole());
             return true;
         } catch (Exception e) {
             response.setStatus(401);
@@ -73,7 +80,11 @@ public class AuthInterceptor implements HandlerInterceptor {
         if (token != null) {
             try {
                 Claims claims = JwtUtil.parse(token);
-                UserContext.set(Long.valueOf(claims.getSubject()), claims.get("nickname", String.class));
+                Long userId = Long.valueOf(claims.getSubject());
+                User user = userMapper.selectById(userId);
+                if (user != null) {
+                    UserContext.set(userId, claims.get("nickname", String.class), user.getRole());
+                }
             } catch (Exception ignored) {}
         }
     }

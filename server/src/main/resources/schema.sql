@@ -109,3 +109,13 @@ CREATE TABLE IF NOT EXISTS notification (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_user_read (user_id, is_read)
 );
+
+CREATE TABLE IF NOT EXISTS operation_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    admin_id BIGINT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    target_type VARCHAR(20),
+    target_id BIGINT,
+    detail VARCHAR(500),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
