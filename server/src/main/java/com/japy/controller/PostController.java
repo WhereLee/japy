@@ -6,6 +6,7 @@ import com.japy.common.UserContext;
 import com.japy.entity.Post;
 import com.japy.mapper.PostMapper;
 import com.japy.service.PostService;
+import com.japy.service.SensitiveWordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +19,7 @@ public class PostController {
 
     private final PostService postService;
     private final PostMapper postMapper;
+    private final SensitiveWordService sensitiveWordService;
 
     @GetMapping
     public R<PageResult<Post>> list(
@@ -36,6 +38,8 @@ public class PostController {
         if (post.getNovelId() == null) {
             return R.fail("请选择一本小说");
         }
+        String hit = sensitiveWordService.check(post.getContent());
+        if (hit != null) return R.fail("内容包含敏感词：" + hit);
         post.setUserId(UserContext.getUserId());
         post.setNickname(UserContext.getNickname());
         return R.ok(postService.create(post));

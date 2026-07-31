@@ -80,3 +80,20 @@ CREATE TABLE IF NOT EXISTS user_block (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_user_blocked (user_id, blocked_user_id)
 );
+
+CREATE TABLE IF NOT EXISTS sensitive_word (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    word VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS report (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    reporter_id BIGINT NOT NULL,
+    target_type VARCHAR(20) NOT NULL COMMENT 'post/comment',
+    target_id BIGINT NOT NULL,
+    reason VARCHAR(500),
+    status TINYINT DEFAULT 0 COMMENT '0=待处理 1=已处理 2=已驳回',
+    result VARCHAR(200),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_status (status)
+);

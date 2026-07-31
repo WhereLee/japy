@@ -7,6 +7,7 @@ import com.japy.entity.Comment;
 import com.japy.mapper.CommentMapper;
 import com.japy.service.CommentService;
 import com.japy.service.PostService;
+import com.japy.service.SensitiveWordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +19,7 @@ public class CommentController {
     private final CommentService commentService;
     private final PostService postService;
     private final CommentMapper commentMapper;
+    private final SensitiveWordService sensitiveWordService;
 
     @GetMapping
     public R<PageResult<Comment>> list(
@@ -35,6 +37,8 @@ public class CommentController {
         if (comment.getPostId() == null) {
             return R.fail("帖子ID不能为空");
         }
+        String hit = sensitiveWordService.check(comment.getContent());
+        if (hit != null) return R.fail("内容包含敏感词：" + hit);
         comment.setUserId(UserContext.getUserId());
         comment.setNickname(UserContext.getNickname());
         Comment saved = commentService.create(comment);
