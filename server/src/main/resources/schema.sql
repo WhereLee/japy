@@ -97,3 +97,15 @@ CREATE TABLE IF NOT EXISTS report (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_status (status)
 );
+
+CREATE TABLE IF NOT EXISTS notification (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL COMMENT '接收者',
+    type VARCHAR(30) NOT NULL COMMENT 'like/comment/reply/hidden/banned/report_result/announcement',
+    ref_type VARCHAR(20) COMMENT 'post/comment',
+    ref_id BIGINT,
+    content VARCHAR(300),
+    is_read TINYINT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_read (user_id, is_read)
+);

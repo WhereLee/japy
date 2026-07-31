@@ -4,8 +4,11 @@ import com.japy.common.PageResult;
 import com.japy.common.R;
 import com.japy.common.UserContext;
 import com.japy.entity.Comment;
+import com.japy.entity.Post;
 import com.japy.mapper.CommentMapper;
+import com.japy.mapper.PostMapper;
 import com.japy.service.CommentService;
+import com.japy.service.NotificationService;
 import com.japy.service.PostService;
 import com.japy.service.SensitiveWordService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +23,8 @@ public class CommentController {
     private final PostService postService;
     private final CommentMapper commentMapper;
     private final SensitiveWordService sensitiveWordService;
+    private final NotificationService notificationService;
+    private final PostMapper postMapper;
 
     @GetMapping
     public R<PageResult<Comment>> list(
@@ -43,6 +48,12 @@ public class CommentController {
         comment.setNickname(UserContext.getNickname());
         Comment saved = commentService.create(comment);
         postService.incrementCommentCount(comment.getPostId());
+        // 通知帖子作者
+        Post post = postMapper.selectById(comment.getPostId());
+        if (post != null && post.getUserId() != null && !post.getUserId().equals(UserContext.getUserId())) {
+            notificationService.send(post.getUserId(), "comment", "post", post.getId(),
+                    UserContext.getNickname() + " 评论了你的帖子");
+        }
         return R.ok(saved);
     }
 

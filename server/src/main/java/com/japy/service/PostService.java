@@ -11,6 +11,7 @@ import com.japy.mapper.PostLikeMapper;
 import com.japy.mapper.PostMapper;
 import com.japy.mapper.UserBlockMapper;
 import com.japy.common.UserContext;
+import com.japy.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class PostService {
     private final PostMapper postMapper;
     private final PostLikeMapper likeMapper;
     private final UserBlockMapper blockMapper;
+    private final NotificationService notificationService;
 
     /**
      * 分页查询帖子（仅正常状态）
@@ -102,6 +104,11 @@ public class PostService {
             likeMapper.insert(like);
             post.setLikeCount(post.getLikeCount() + 1);
             postMapper.updateById(post);
+            // 通知帖子作者
+            if (post.getUserId() != null && !post.getUserId().equals(UserContext.getUserId())) {
+                notificationService.send(post.getUserId(), "like", "post", postId,
+                        UserContext.getNickname() + " 赞了你的帖子");
+            }
             return true;
         }
     }
