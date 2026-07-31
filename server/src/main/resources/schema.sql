@@ -64,3 +64,19 @@ INSERT IGNORE INTO novel (id, title, author) VALUES
 (1, '龙族2·悼亡者之瞳', '江南'),
 (2, '天龙八部（世纪新修版）', '金庸'),
 (3, '斗破苍穹', '天蚕土豆');
+
+CREATE TABLE IF NOT EXISTS post_favorite (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    post_id BIGINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_post (user_id, post_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_block (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    blocked_user_id BIGINT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_blocked (user_id, blocked_user_id)
+);

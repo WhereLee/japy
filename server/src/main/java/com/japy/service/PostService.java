@@ -6,11 +6,17 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.japy.common.PageResult;
 import com.japy.entity.Post;
 import com.japy.entity.PostLike;
+import com.japy.entity.UserBlock;
 import com.japy.mapper.PostLikeMapper;
 import com.japy.mapper.PostMapper;
+import com.japy.mapper.UserBlockMapper;
+import com.japy.common.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +24,7 @@ public class PostService {
 
     private final PostMapper postMapper;
     private final PostLikeMapper likeMapper;
+    private final UserBlockMapper blockMapper;
 
     /**
      * 分页查询帖子（仅正常状态）
@@ -28,6 +35,17 @@ public class PostService {
         LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
                 .eq(Post::getNovelId, novelId)
                 .eq(Post::getStatus, 0);
+
+        // 过滤屏蔽用户的帖子
+        Long currentUserId = UserContext.getUserId();
+        if (currentUserId != null) {
+            List<Long> blockedIds = blockMapper.selectList(
+                    new LambdaQueryWrapper<UserBlock>().eq(UserBlock::getUserId, currentUserId))
+                    .stream().map(UserBlock::getBlockedUserId).collect(Collectors.toList());
+            if (!blockedIds.isEmpty()) {
+                wrapper.notIn(Post::getUserId, blockedIds);
+            }
+        }
 
         if ("hot".equals(sort)) {
             wrapper.orderByDesc(Post::getPinned)
