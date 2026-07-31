@@ -5,16 +5,12 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("post")
-public class Post {
+@TableName("user")
+public class User {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long novelId;
-    private Long userId;
+    private String username;
+    private String password;
     private String nickname;
-    private String content;
-    private String quoteText;
-    private Integer likeCount;
-    private Integer commentCount;
     private LocalDateTime createdAt;
 }
