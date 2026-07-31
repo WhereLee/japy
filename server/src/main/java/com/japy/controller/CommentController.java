@@ -1,5 +1,6 @@
 package com.japy.controller;
 
+import com.japy.common.PageResult;
 import com.japy.common.R;
 import com.japy.common.UserContext;
 import com.japy.entity.Comment;
@@ -8,8 +9,6 @@ import com.japy.service.CommentService;
 import com.japy.service.PostService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/comments")
@@ -21,8 +20,11 @@ public class CommentController {
     private final CommentMapper commentMapper;
 
     @GetMapping
-    public R<List<Comment>> list(@RequestParam Long postId) {
-        return R.ok(commentService.listByPost(postId));
+    public R<PageResult<Comment>> list(
+            @RequestParam Long postId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return R.ok(commentService.listByPost(postId, page, size));
     }
 
     @PostMapping
@@ -47,7 +49,7 @@ public class CommentController {
         if (!comment.getUserId().equals(UserContext.getUserId())) {
             return R.fail("只能删除自己的评论");
         }
-        commentService.delete(id);
+        commentService.softDelete(id);
         return R.ok();
     }
 }

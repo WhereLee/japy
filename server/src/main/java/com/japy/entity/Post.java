@@ -16,5 +16,8 @@ public class Post {
     private String quoteText;
     private Integer likeCount;
     private Integer commentCount;
+    private Integer status;
+    private Integer pinned;
+    private Integer featured;
     private LocalDateTime createdAt;
 }

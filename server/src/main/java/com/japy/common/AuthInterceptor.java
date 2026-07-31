@@ -1,5 +1,7 @@
 package com.japy.common;
 
+import com.japy.entity.User;
+import com.japy.mapper.UserMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -8,6 +10,12 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
+
+    private final UserMapper userMapper;
+
+    public AuthInterceptor(UserMapper userMapper) {
+        this.userMapper = userMapper;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -36,6 +44,14 @@ public class AuthInterceptor implements HandlerInterceptor {
             Claims claims = JwtUtil.parse(token);
             Long userId = Long.valueOf(claims.getSubject());
             String nickname = claims.get("nickname", String.class);
+            // 检查封禁状态
+            User user = userMapper.selectById(userId);
+            if (user == null || user.getStatus() == 1) {
+                response.setStatus(403);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":403,\"msg\":\"账号已被封禁\"}");
+                return false;
+            }
             UserContext.set(userId, nickname);
             return true;
         } catch (Exception e) {

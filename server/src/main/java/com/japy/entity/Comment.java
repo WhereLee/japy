@@ -14,5 +14,6 @@ public class Comment {
     private String nickname;
     private String replyTo;
     private String content;
+    private Integer status;
     private LocalDateTime createdAt;
 }
