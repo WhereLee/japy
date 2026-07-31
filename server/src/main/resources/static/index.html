@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拼象 · 小说讨论社区</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0d1117; --surface: #161b22; --border: #30363d;
+            --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+            --like: #f85149; --green: #3fb950;
+        }
+        body { font-family: -apple-system, "Noto Sans SC", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        .container { max-width: 640px; margin: 0 auto; padding: 20px 16px; }
+        h1 { font-size: 22px; text-align: center; margin-bottom: 6px; }
+        .subtitle { text-align: center; color: var(--dim); font-size: 13px; margin-bottom: 24px; }
+
+        /* 小说选择 */
+        .novel-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .novel-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--dim); cursor: pointer; font-size: 13px; transition: all .2s; }
+        .novel-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .novel-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+        /* 发帖框 */
+        .composer { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 24px; }
+        .composer input, .composer textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; margin-bottom: 10px; resize: none; font-family: inherit; }
+        .composer input:focus, .composer textarea:focus { border-color: var(--accent); outline: none; }
+        .composer .row { display: flex; gap: 10px; align-items: center; }
+        .composer .row input { flex: 1; margin-bottom: 0; }
+        .btn-send { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+        .btn-send:hover { opacity: .85; }
+
+        /* 帖子卡片 */
+        .post-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+        .post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .post-nick { font-weight: 600; font-size: 14px; color: var(--accent); }
+        .post-time { font-size: 12px; color: var(--dim); }
+        .post-content { font-size: 14px; line-height: 1.7; margin-bottom: 10px; white-space: pre-wrap; }
+        .post-quote { border-left: 3px solid var(--accent); padding: 8px 12px; background: rgba(88,166,255,.06); border-radius: 0 6px 6px 0; font-size: 13px; color: var(--dim); margin-bottom: 10px; }
+        .post-actions { display: flex; gap: 16px; font-size: 13px; color: var(--dim); }
+        .post-actions span { cursor: pointer; transition: color .2s; }
+        .post-actions .like-btn:hover, .post-actions .like-btn.liked { color: var(--like); }
+        .post-actions .comment-btn:hover { color: var(--accent); }
+        .post-actions .del-btn:hover { color: var(--like); }
+
+        /* 评论区 */
+        .comments { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+        .comment-item { font-size: 13px; margin-bottom: 8px; line-height: 1.5; }
+        .comment-item .c-nick { color: var(--accent); font-weight: 500; }
+        .comment-item .c-reply { color: var(--dim); }
+        .comment-item .c-reply-btn { color: var(--dim); font-size: 12px; cursor: pointer; margin-left: 6px; }
+        .comment-item .c-reply-btn:hover { color: var(--accent); }
+        .comment-form { display: flex; gap: 8px; margin-top: 10px; }
+        .comment-form input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 13px; }
+        .comment-form input:focus { border-color: var(--accent); outline: none; }
+        .comment-form button { padding: 7px 14px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+
+        .empty { text-align: center; color: var(--dim); padding: 40px; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>拼象</h1>
+    <p class="subtitle">一千个读者，拼出一头完整的大象</p>
+
+    <div class="novel-bar" id="novelBar"></div>
+
+    <div class="composer" id="composer" style="display:none">
+        <textarea id="postContent" rows="3" placeholder="说说你对这本书的看法..."></textarea>
+        <input id="postQuote" placeholder="引用原文（可选）">
+        <div class="row">
+            <input id="nickname" placeholder="你的昵称">
+            <button class="btn-send" onclick="submitPost()">发布</button>
+        </div>
+    </div>
+
+    <div id="feed"></div>
+</div>
+
+<script>
+let currentNovel = null;
+let myNick = localStorage.getItem('nickname') || '';
+
+// 加载小说列表
+async function loadNovels() {
+    const res = await fetch('/api/novels');
+    const { data } = await res.json();
+    const bar = document.getElementById('novelBar');
+    bar.innerHTML = data.map(n =>
+        `<button class="novel-btn" data-id="${n.id}" onclick="selectNovel(${n.id}, this)">${n.title} (${n.postCount})</button>`
+    ).join('');
+}
+
+function selectNovel(id, btn) {
+    currentNovel = id;
+    document.querySelectorAll('.novel-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('composer').style.display = 'block';
+    if (myNick) document.getElementById('nickname').value = myNick;
+    loadPosts();
+}
+
+// 加载帖子
+async function loadPosts() {
+    const res = await fetch(`/api/posts?novelId=${currentNovel}`);
+    const { data } = await res.json();
+    const feed = document.getElementById('feed');
+    if (!data || data.length === 0) {
+        feed.innerHTML = '<div class="empty">还没有讨论，来发第一条吧</div>';
+        return;
+    }
+    feed.innerHTML = data.map(p => renderPost(p)).join('');
+    // 加载所有帖子的评论
+    data.forEach(p => loadComments(p.id));
+}
+
+function renderPost(p) {
+    const time = new Date(p.createdAt).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    const quote = p.quoteText ? `<div class="post-quote">「${esc(p.quoteText)}」</div>` : '';
+    return `
+    <div class="post-card" id="post-${p.id}">
+        <div class="post-header">
+            <span class="post-nick">${esc(p.nickname)}</span>
+            <span class="post-time">${time}</span>
+        </div>
+        <div class="post-content">${esc(p.content)}</div>
+        ${quote}
+        <div class="post-actions">
+            <span class="like-btn" onclick="toggleLike(${p.id})">❤ ${p.likeCount || 0}</span>
+            <span class="comment-btn">💬 ${p.commentCount || 0}</span>
+            <span class="del-btn" onclick="deletePost(${p.id})">删除</span>
+        </div>
+        <div class="comments" id="comments-${p.id}">
+            <div class="comment-list" id="clist-${p.id}"></div>
+            <div class="comment-form">
+                <input id="cinput-${p.id}" placeholder="写评论..." onkeydown="if(event.key==='Enter')submitComment(${p.id})">
+                <button onclick="submitComment(${p.id})">发送</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+// 发帖
+async function submitPost() {
+    const content = document.getElementById('postContent').value.trim();
+    const quote = document.getElementById('postQuote').value.trim();
+    const nick = document.getElementById('nickname').value.trim();
+    if (!content || !nick) return alert('昵称和内容不能为空');
+    localStorage.setItem('nickname', nick);
+    myNick = nick;
+
+    await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ novelId: currentNovel, nickname: nick, content, quoteText: quote || null })
+    });
+    document.getElementById('postContent').value = '';
+    document.getElementById('postQuote').value = '';
+    loadPosts();
+}
+
+// 点赞
+async function toggleLike(postId) {
+    const nick = document.getElementById('nickname').value.trim() || myNick;
+    if (!nick) return alert('先填个昵称');
+    await fetch(`/api/posts/${postId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname: nick })
+    });
+    loadPosts();
+}
+
+// 删帖
+async function deletePost(postId) {
+    if (!confirm('确定删除？')) return;
+    await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+    loadPosts();
+}
+
+// 评论
+
+
+async function loadComments(postId) {
+    const res = await fetch(`/api/comments?postId=${postId}`);
+    const { data } = await res.json();
+    const list = document.getElementById(`clist-${postId}`);
+    list.innerHTML = (data || []).map(c => {
+        const reply = c.replyTo ? `<span class="c-reply">回复 @${esc(c.replyTo)}：</span>` : '';
+        return `<div class="comment-item"><span class="c-nick">${esc(c.nickname)}</span> ${reply}${esc(c.content)} <span class="c-reply-btn" onclick="setReply(${postId},'${esc(c.nickname)}')">回复</span></div>`;
+    }).join('');
+}
+
+let currentReplyTo = {};  // postId -> replyTo nickname
+
+function setReply(postId, nick) {
+    currentReplyTo[postId] = nick;
+    const input = document.getElementById(`cinput-${postId}`);
+    input.placeholder = `回复 @${nick}...`;
+    input.focus();
+}
+
+async function submitComment(postId) {
+    const input = document.getElementById(`cinput-${postId}`);
+    const content = input.value.trim();
+    const nick = document.getElementById('nickname').value.trim() || myNick;
+    if (!content || !nick) return;
+
+    const replyTo = currentReplyTo[postId] || null;
+    await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId, nickname: nick, content, replyTo })
+    });
+    input.value = '';
+    input.placeholder = '写评论...';
+    delete currentReplyTo[postId];
+    loadComments(postId);
+    loadPosts();
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+loadNovels();
+</script>
+</body>
+</html>
