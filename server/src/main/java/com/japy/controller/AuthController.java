@@ -38,6 +38,8 @@ public class AuthController {
         user.setUsername(username);
         user.setPassword(encoder.encode(password));
         user.setNickname(nickname);
+        user.setRole("user");
+        user.setStatus(0);
         userMapper.insert(user);
 
         String token = JwtUtil.generate(user.getId(), username, nickname);

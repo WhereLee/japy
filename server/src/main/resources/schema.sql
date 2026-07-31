@@ -65,6 +65,10 @@ INSERT IGNORE INTO novel (id, title, author) VALUES
 (2, '天龙八部（世纪新修版）', '金庸'),
 (3, '斗破苍穹', '天蚕土豆');
 
+-- 预置管理员账号（密码: admin123）
+INSERT IGNORE INTO user (id, username, password, nickname, role, status) VALUES
+(1, 'admin', '$2b$12$RVM5zrsD2qksFVZgQ7rNVOdK4sKo1bWXrljVkZ3F4MGblXA4Owve.', '管理员', 'admin', 0);
+
 CREATE TABLE IF NOT EXISTS post_favorite (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
