@@ -5,75 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>拼象 · 小说讨论社区</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #0d1117; --surface: #161b22; --border: #30363d;
-            --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
-            --like: #f85149; --green: #3fb950;
-        }
-        body { font-family: -apple-system, "Noto Sans SC", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-        .container { max-width: 640px; margin: 0 auto; padding: 20px 16px; }
-        h1 { font-size: 22px; text-align: center; margin-bottom: 6px; }
-        .subtitle { text-align: center; color: var(--dim); font-size: 13px; margin-bottom: 24px; }
-
-        /* 顶栏用户信息 */
-        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .top-bar .user-info { font-size: 13px; color: var(--dim); }
-        .top-bar .user-info strong { color: var(--accent); }
-        .btn-logout { background: none; border: 1px solid var(--border); color: var(--dim); padding: 4px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
-        .btn-logout:hover { border-color: var(--like); color: var(--like); }
-
-        /* 登录/注册 */
-        .auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px 24px; max-width: 360px; margin: 60px auto; }
-        .auth-box h2 { font-size: 18px; margin-bottom: 20px; text-align: center; }
-        .auth-box input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; margin-bottom: 12px; }
-        .auth-box input:focus { border-color: var(--accent); outline: none; }
-        .auth-box .btn-primary { width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 4px; }
-        .auth-box .btn-primary:hover { opacity: .85; }
-        .auth-box .switch { text-align: center; margin-top: 14px; font-size: 13px; color: var(--dim); }
-        .auth-box .switch a { color: var(--accent); cursor: pointer; text-decoration: none; }
-        .auth-box .error { color: var(--like); font-size: 13px; margin-bottom: 10px; text-align: center; display: none; }
-
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--dim:#8b949e;--accent:#58a6ff;--like:#f85149;--green:#3fb950}
+        body{font-family:-apple-system,"Noto Sans SC",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+        .container{max-width:640px;margin:0 auto;padding:20px 16px}
+        h1{font-size:22px;text-align:center;margin-bottom:4px}
+        .subtitle{text-align:center;color:var(--dim);font-size:13px;margin-bottom:20px}
+        .hidden{display:none}
+        /* 通用 */
+        input,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px;margin-bottom:10px;font-family:inherit}
+        input:focus,textarea:focus{border-color:var(--accent);outline:none}
+        .btn{padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer}
+        .btn:hover{opacity:.85}
+        .btn-sm{padding:4px 10px;font-size:12px;border-radius:6px}
+        .btn-outline{background:none;border:1px solid var(--border);color:var(--dim)}
+        .btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+        /* 顶栏 */
+        .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+        .top-bar .user-info{font-size:13px;color:var(--dim)}
+        .top-bar .user-info strong{color:var(--accent);cursor:pointer}
+        .top-bar .actions{display:flex;gap:8px;align-items:center}
+        .badge{background:var(--like);color:#fff;font-size:11px;padding:1px 5px;border-radius:8px;margin-left:4px}
+        /* 认证 */
+        .auth-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 24px;max-width:360px;margin:60px auto}
+        .auth-box h2{font-size:18px;margin-bottom:16px;text-align:center}
+        .auth-box .error{color:var(--like);font-size:13px;margin-bottom:10px;text-align:center;display:none}
+        .auth-box .switch{text-align:center;margin-top:12px;font-size:13px;color:var(--dim)}
+        .auth-box .switch a{color:var(--accent);cursor:pointer}
+        /* 工具栏 */
+        .toolbar{display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+        .toolbar input{flex:1;margin-bottom:0}
+        .sort-btns{display:flex;gap:4px}
+        .sort-btn{padding:4px 10px;border-radius:12px;border:1px solid var(--border);background:none;color:var(--dim);font-size:12px;cursor:pointer}
+        .sort-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
         /* 小说选择 */
-        .novel-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
-        .novel-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--dim); cursor: pointer; font-size: 13px; transition: all .2s; }
-        .novel-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-        .novel-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
-
-        /* 发帖框 */
-        .composer { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 24px; }
-        .composer textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; margin-bottom: 10px; resize: none; font-family: inherit; }
-        .composer input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 14px; margin-bottom: 10px; }
-        .composer textarea:focus, .composer input:focus { border-color: var(--accent); outline: none; }
-        .btn-send { padding: 8px 20px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
-        .btn-send:hover { opacity: .85; }
-
-        /* 帖子卡片 */
-        .post-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
-        .post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .post-nick { font-weight: 600; font-size: 14px; color: var(--accent); }
-        .post-time { font-size: 12px; color: var(--dim); }
-        .post-content { font-size: 14px; line-height: 1.7; margin-bottom: 10px; white-space: pre-wrap; }
-        .post-quote { border-left: 3px solid var(--accent); padding: 8px 12px; background: rgba(88,166,255,.06); border-radius: 0 6px 6px 0; font-size: 13px; color: var(--dim); margin-bottom: 10px; }
-        .post-actions { display: flex; gap: 16px; font-size: 13px; color: var(--dim); }
-        .post-actions span { cursor: pointer; transition: color .2s; }
-        .post-actions .like-btn:hover { color: var(--like); }
-        .post-actions .del-btn:hover { color: var(--like); }
-
-        /* 评论区 */
-        .comments { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
-        .comment-item { font-size: 13px; margin-bottom: 8px; line-height: 1.5; }
-        .comment-item .c-nick { color: var(--accent); font-weight: 500; }
-        .comment-item .c-reply { color: var(--dim); }
-        .comment-item .c-reply-btn { color: var(--dim); font-size: 12px; cursor: pointer; margin-left: 6px; }
-        .comment-item .c-reply-btn:hover { color: var(--accent); }
-        .comment-form { display: flex; gap: 8px; margin-top: 10px; }
-        .comment-form input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 13px; }
-        .comment-form input:focus { border-color: var(--accent); outline: none; }
-        .comment-form button { padding: 7px 14px; background: var(--accent); color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
-
-        .empty { text-align: center; color: var(--dim); padding: 40px; font-size: 14px; }
-        .hidden { display: none; }
+        .novel-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;justify-content:center}
+        .novel-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--dim);cursor:pointer;font-size:13px}
+        .novel-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+        /* 发帖 */
+        .composer{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px}
+        .composer textarea{resize:none;margin-bottom:8px}
+        /* 帖子 */
+        .post-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}
+        .post-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+        .post-nick{font-weight:600;font-size:14px;color:var(--accent);cursor:pointer}
+        .post-time{font-size:12px;color:var(--dim)}
+        .post-content{font-size:14px;line-height:1.7;margin-bottom:8px;white-space:pre-wrap}
+        .post-quote{border-left:3px solid var(--accent);padding:6px 10px;background:rgba(88,166,255,.06);border-radius:0 6px 6px 0;font-size:13px;color:var(--dim);margin-bottom:8px}
+        .post-actions{display:flex;gap:14px;font-size:13px;color:var(--dim);flex-wrap:wrap}
+        .post-actions span{cursor:pointer;transition:color .2s}
+        .post-actions span:hover{color:var(--accent)}
+        .tag-pin{color:var(--green);font-size:11px;font-weight:600}
+        .tag-feat{color:gold;font-size:11px;font-weight:600}
+        /* 评论 */
+        .comments{margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+        .comment-item{font-size:13px;margin-bottom:6px;line-height:1.5}
+        .c-nick{color:var(--accent);font-weight:500}
+        .c-reply{color:var(--dim)}
+        .c-reply-btn{color:var(--dim);font-size:12px;cursor:pointer;margin-left:4px}
+        .c-reply-btn:hover{color:var(--accent)}
+        .comment-form{display:flex;gap:6px;margin-top:8px}
+        .comment-form input{flex:1;margin-bottom:0;padding:7px 10px;font-size:13px}
+        /* 分页 */
+        .pagination{display:flex;justify-content:center;gap:8px;margin:16px 0}
+        .pagination button{padding:6px 12px;border:1px solid var(--border);background:none;color:var(--dim);border-radius:6px;cursor:pointer;font-size:13px}
+        .pagination button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+        .pagination button:disabled{opacity:.4;cursor:default}
+        /* 个人中心 */
+        .profile-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+        .profile-card h3{margin-bottom:12px;font-size:16px}
+        .tabs{display:flex;gap:8px;margin-bottom:14px}
+        .tab{padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--dim);cursor:pointer;font-size:13px}
+        .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+        /* 通知 */
+        .notif-item{padding:10px;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5}
+        .notif-item.unread{background:rgba(88,166,255,.05)}
+        .notif-time{font-size:11px;color:var(--dim)}
+        .empty{text-align:center;color:var(--dim);padding:30px;font-size:14px}
     </style>
 </head>
 <body>
@@ -81,7 +89,7 @@
     <h1>拼象</h1>
     <p class="subtitle">一千个读者，拼出一头完整的大象</p>
 
-    <!-- 登录/注册 -->
+    <!-- 认证 -->
     <div id="authSection">
         <div class="auth-box">
             <h2 id="authTitle">登录</h2>
@@ -89,202 +97,128 @@
             <input id="authUsername" placeholder="用户名">
             <input id="authPassword" type="password" placeholder="密码">
             <input id="authNickname" placeholder="昵称（注册时填写）" class="hidden">
-            <button class="btn-primary" id="authBtn" onclick="doAuth()">登录</button>
+            <button class="btn" style="width:100%" id="authBtn" onclick="doAuth()">登录</button>
             <div class="switch" id="authSwitch">没有账号？<a onclick="toggleAuthMode()">注册</a></div>
         </div>
     </div>
 
-    <!-- 主内容 -->
+    <!-- 主界面 -->
     <div id="mainSection" class="hidden">
         <div class="top-bar">
-            <span class="user-info">当前用户：<strong id="displayNick"></strong></span>
-            <button class="btn-logout" onclick="logout()">退出</button>
+            <span class="user-info"><strong onclick="showProfile()"><span id="displayNick"></span></strong></span>
+            <div class="actions">
+                <span style="cursor:pointer;font-size:13px;color:var(--dim)" onclick="showNotifications()">🔔<span class="badge hidden" id="unreadBadge">0</span></span>
+                <button class="btn-sm btn-outline" onclick="showProfile()">个人中心</button>
+                <button class="btn-sm btn-outline" onclick="logout()">退出</button>
+            </div>
         </div>
-        <div class="novel-bar" id="novelBar"></div>
-        <div class="composer" id="composer" style="display:none">
-            <textarea id="postContent" rows="3" placeholder="说说你对这本书的看法..."></textarea>
-            <input id="postQuote" placeholder="引用原文（可选）">
-            <button class="btn-send" onclick="submitPost()">发布</button>
+
+        <!-- 信息流视图 -->
+        <div id="feedView">
+            <div class="novel-bar" id="novelBar"></div>
+            <div class="toolbar">
+                <input id="searchInput" placeholder="搜索帖子..." onkeydown="if(event.key==='Enter')doSearch()">
+                <button class="btn btn-sm" onclick="doSearch()">搜索</button>
+                <div class="sort-btns">
+                    <button class="sort-btn active" id="sortNew" onclick="setSort('new')">最新</button>
+                    <button class="sort-btn" id="sortHot" onclick="setSort('hot')">最热</button>
+                </div>
+            </div>
+            <div class="composer" id="composer" style="display:none">
+                <textarea id="postContent" rows="3" placeholder="说说你对这本书的看法..."></textarea>
+                <input id="postQuote" placeholder="引用原文（可选）">
+                <button class="btn" onclick="submitPost()">发布</button>
+            </div>
+            <div id="feed"></div>
+            <div class="pagination" id="pagination"></div>
         </div>
-        <div id="feed"></div>
+
+        <!-- 个人中心视图 -->
+        <div id="profileView" class="hidden">
+            <div class="profile-card">
+                <h3>个人中心</h3>
+                <input id="editNickname" placeholder="昵称">
+                <input id="editAvatar" placeholder="头像URL（可选）">
+                <input id="editBio" placeholder="一句话介绍（可选）">
+                <button class="btn btn-sm" onclick="saveProfile()">保存资料</button>
+                <button class="btn-sm btn-outline" style="margin-left:8px" onclick="changePassword()">修改密码</button>
+            </div>
+            <div class="tabs">
+                <button class="tab active" onclick="showMyTab('posts',this)">我的帖子</button>
+                <button class="tab" onclick="showMyTab('comments',this)">我的评论</button>
+                <button class="tab" onclick="showMyTab('favorites',this)">我的收藏</button>
+            </div>
+            <div id="myContent"></div>
+        </div>
+
+        <!-- 通知视图 -->
+        <div id="notifView" class="hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+                <h3 style="font-size:16px">通知</h3>
+                <button class="btn-sm btn-outline" onclick="readAllNotif()">全部已读</button>
+            </div>
+            <div id="notifList"></div>
+        </div>
     </div>
 </div>
 
 <script>
-let currentNovel = null;
-let isRegister = false;
-let token = localStorage.getItem('token') || '';
-let myNick = localStorage.getItem('nickname') || '';
-let myUserId = localStorage.getItem('userId') || '';
-let currentReplyTo = {};
+let token=localStorage.getItem('token')||'', myNick=localStorage.getItem('nickname')||'', myUserId=localStorage.getItem('userId')||'';
+let currentNovel=null, currentSort='new', currentPage=1, isRegister=false, currentReplyTo={};
+
+function headers(){const h={'Content-Type':'application/json'};if(token)h['Authorization']='Bearer '+token;return h}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 
 // ===== 认证 =====
-function toggleAuthMode() {
-    isRegister = !isRegister;
-    document.getElementById('authTitle').textContent = isRegister ? '注册' : '登录';
-    document.getElementById('authBtn').textContent = isRegister ? '注册' : '登录';
-    document.getElementById('authNickname').classList.toggle('hidden', !isRegister);
-    document.getElementById('authSwitch').innerHTML = isRegister
-        ? '已有账号？<a onclick="toggleAuthMode()">登录</a>'
-        : '没有账号？<a onclick="toggleAuthMode()">注册</a>';
-    document.getElementById('authError').style.display = 'none';
-}
+function toggleAuthMode(){isRegister=!isRegister;document.getElementById('authTitle').textContent=isRegister?'注册':'登录';document.getElementById('authBtn').textContent=isRegister?'注册':'登录';document.getElementById('authNickname').classList.toggle('hidden',!isRegister);document.getElementById('authSwitch').innerHTML=isRegister?'已有账号？<a onclick="toggleAuthMode()">登录</a>':'没有账号？<a onclick="toggleAuthMode()">注册</a>';document.getElementById('authError').style.display='none'}
+async function doAuth(){const u=document.getElementById('authUsername').value.trim(),p=document.getElementById('authPassword').value,n=document.getElementById('authNickname').value.trim();const err=document.getElementById('authError');const url=isRegister?'/auth/register':'/auth/login';const body=isRegister?{username:u,password:p,nickname:n}:{username:u,password:p};try{const r=await(await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();if(r.code!==200){err.textContent=r.msg;err.style.display='block';return}token=r.data.token;myNick=r.data.nickname;myUserId=r.data.userId;localStorage.setItem('token',token);localStorage.setItem('nickname',myNick);localStorage.setItem('userId',myUserId);enterMain()}catch(e){err.textContent='网络错误';err.style.display='block'}}
+function logout(){token='';myNick='';myUserId='';localStorage.clear();document.getElementById('authSection').classList.remove('hidden');document.getElementById('mainSection').classList.add('hidden')}
+function enterMain(){document.getElementById('authSection').classList.add('hidden');document.getElementById('mainSection').classList.remove('hidden');document.getElementById('displayNick').textContent=myNick;showFeed();loadNovels();loadUnread()}
 
-async function doAuth() {
-    const username = document.getElementById('authUsername').value.trim();
-    const password = document.getElementById('authPassword').value;
-    const nickname = document.getElementById('authNickname').value.trim();
-    const errEl = document.getElementById('authError');
-
-    const url = isRegister ? '/auth/register' : '/auth/login';
-    const body = isRegister ? { username, password, nickname } : { username, password };
-
-    try {
-        const res = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-        const r = await res.json();
-        if (r.code !== 200) { errEl.textContent = r.msg; errEl.style.display = 'block'; return; }
-        token = r.data.token; myNick = r.data.nickname; myUserId = r.data.userId;
-        localStorage.setItem('token', token);
-        localStorage.setItem('nickname', myNick);
-        localStorage.setItem('userId', myUserId);
-        enterMain();
-    } catch(e) { errEl.textContent = '网络错误'; errEl.style.display = 'block'; }
-}
-
-function logout() {
-    token = ''; myNick = ''; myUserId = '';
-    localStorage.removeItem('token');
-    localStorage.removeItem('nickname');
-    localStorage.removeItem('userId');
-    document.getElementById('authSection').classList.remove('hidden');
-    document.getElementById('mainSection').classList.add('hidden');
-}
-
-function enterMain() {
-    document.getElementById('authSection').classList.add('hidden');
-    document.getElementById('mainSection').classList.remove('hidden');
-    document.getElementById('displayNick').textContent = myNick;
-    loadNovels();
-}
-
-// ===== API 工具 =====
-function headers() {
-    const h = { 'Content-Type': 'application/json' };
-    if (token) h['Authorization'] = 'Bearer ' + token;
-    return h;
-}
+// ===== 视图切换 =====
+function showFeed(){document.getElementById('feedView').classList.remove('hidden');document.getElementById('profileView').classList.add('hidden');document.getElementById('notifView').classList.add('hidden')}
+function showProfile(){document.getElementById('feedView').classList.add('hidden');document.getElementById('profileView').classList.remove('hidden');document.getElementById('notifView').classList.add('hidden');document.getElementById('editNickname').value=myNick;showMyTab('posts',document.querySelector('.tab'))}
+function showNotifications(){document.getElementById('feedView').classList.add('hidden');document.getElementById('profileView').classList.add('hidden');document.getElementById('notifView').classList.remove('hidden');loadNotifs()}
 
 // ===== 小说 =====
-async function loadNovels() {
-    const res = await fetch('/api/novels');
-    const { data } = await res.json();
-    document.getElementById('novelBar').innerHTML = data.map(n =>
-        `<button class="novel-btn" data-id="${n.id}" onclick="selectNovel(${n.id}, this)">${n.title} (${n.postCount})</button>`
-    ).join('');
-}
+async function loadNovels(){const{data}=await(await fetch('/api/novels')).json();document.getElementById('novelBar').innerHTML=data.map(n=>`<button class="novel-btn" onclick="selectNovel(${n.id},this)">${esc(n.title)} (${n.postCount})</button>`).join('')}
+function selectNovel(id,btn){currentNovel=id;currentPage=1;document.querySelectorAll('.novel-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.getElementById('composer').style.display='block';loadPosts()}
 
-function selectNovel(id, btn) {
-    currentNovel = id;
-    document.querySelectorAll('.novel-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('composer').style.display = 'block';
-    loadPosts();
-}
+// ===== 信息流 =====
+function setSort(s){currentSort=s;currentPage=1;document.getElementById('sortNew').classList.toggle('active',s==='new');document.getElementById('sortHot').classList.toggle('active',s==='hot');loadPosts()}
+async function loadPosts(){if(!currentNovel)return;const{data}=await(await fetch(`/api/posts?novelId=${currentNovel}&page=${currentPage}&size=10&sort=${currentSort}`)).json();const feed=document.getElementById('feed');if(!data.list||data.list.length===0){feed.innerHTML='<div class="empty">还没有讨论</div>';document.getElementById('pagination').innerHTML='';return}feed.innerHTML=data.list.map(renderPost).join('');data.list.forEach(p=>loadComments(p.id));renderPagination(data.total,data.page,data.size)}
+function renderPagination(total,page,size){const pages=Math.ceil(total/size);if(pages<=1){document.getElementById('pagination').innerHTML='';return}let h=`<button ${page<=1?'disabled':''} onclick="goPage(${page-1})">上一页</button>`;for(let i=1;i<=Math.min(pages,7);i++)h+=`<button class="${i===page?'active':''}" onclick="goPage(${i})">${i}</button>`;h+=`<button ${page>=pages?'disabled':''} onclick="goPage(${page+1})">下一页</button>`;document.getElementById('pagination').innerHTML=h}
+function goPage(p){currentPage=p;loadPosts()}
 
-// ===== 帖子 =====
-async function loadPosts() {
-    const res = await fetch(`/api/posts?novelId=${currentNovel}`);
-    const { data } = await res.json();
-    const feed = document.getElementById('feed');
-    if (!data || data.length === 0) { feed.innerHTML = '<div class="empty">还没有讨论，来发第一条吧</div>'; return; }
-    feed.innerHTML = data.map(p => renderPost(p)).join('');
-    data.forEach(p => loadComments(p.id));
-}
+function renderPost(p){const time=new Date(p.createdAt).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});const quote=p.quoteText?`<div class="post-quote">「${esc(p.quoteText)}」</div>`:'';const pin=p.pinned?'<span class="tag-pin">[置顶]</span>':'';const feat=p.featured?'<span class="tag-feat">[精]</span>':'';const del=(String(p.userId)===String(myUserId))?`<span onclick="deletePost(${p.id})">删除</span>`:'';return `<div class="post-card"><div class="post-header"><span>${pin}${feat} <span class="post-nick" onclick="viewUser(${p.userId})">${esc(p.nickname)}</span></span><span class="post-time">${time}</span></div><div class="post-content">${esc(p.content)}</div>${quote}<div class="post-actions"><span onclick="toggleLike(${p.id})">❤ ${p.likeCount||0}</span><span>💬 ${p.commentCount||0}</span><span onclick="toggleFav(${p.id})">⭐ 收藏</span><span onclick="reportPost(${p.id})">举报</span><span onclick="blockUser(${p.userId})">屏蔽</span>${del}</div><div class="comments"><div id="clist-${p.id}"></div><div class="comment-form"><input id="cinput-${p.id}" placeholder="写评论..." onkeydown="if(event.key==='Enter')submitComment(${p.id})"><button class="btn btn-sm" onclick="submitComment(${p.id})">发送</button></div></div></div>`}
 
-function renderPost(p) {
-    const time = new Date(p.createdAt).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-    const quote = p.quoteText ? `<div class="post-quote">「${esc(p.quoteText)}」</div>` : '';
-    const del = (String(p.userId) === String(myUserId)) ? `<span class="del-btn" onclick="deletePost(${p.id})">删除</span>` : '';
-    return `
-    <div class="post-card">
-        <div class="post-header">
-            <span class="post-nick">${esc(p.nickname)}</span>
-            <span class="post-time">${time}</span>
-        </div>
-        <div class="post-content">${esc(p.content)}</div>
-        ${quote}
-        <div class="post-actions">
-            <span class="like-btn" onclick="toggleLike(${p.id})">❤ ${p.likeCount || 0}</span>
-            <span>💬 ${p.commentCount || 0}</span>
-            ${del}
-        </div>
-        <div class="comments">
-            <div class="comment-list" id="clist-${p.id}"></div>
-            <div class="comment-form">
-                <input id="cinput-${p.id}" placeholder="写评论..." onkeydown="if(event.key==='Enter')submitComment(${p.id})">
-                <button onclick="submitComment(${p.id})">发送</button>
-            </div>
-        </div>
-    </div>`;
-}
-
-async function submitPost() {
-    const content = document.getElementById('postContent').value.trim();
-    const quote = document.getElementById('postQuote').value.trim();
-    if (!content) return;
-    await fetch('/api/posts', { method: 'POST', headers: headers(), body: JSON.stringify({ novelId: currentNovel, content, quoteText: quote || null }) });
-    document.getElementById('postContent').value = '';
-    document.getElementById('postQuote').value = '';
-    loadPosts(); loadNovels();
-}
-
-async function toggleLike(postId) {
-    await fetch(`/api/posts/${postId}/like`, { method: 'POST', headers: headers() });
-    loadPosts();
-}
-
-async function deletePost(postId) {
-    if (!confirm('确定删除？')) return;
-    await fetch(`/api/posts/${postId}`, { method: 'DELETE', headers: headers() });
-    loadPosts(); loadNovels();
-}
+// ===== 帖子操作 =====
+async function submitPost(){const content=document.getElementById('postContent').value.trim(),quote=document.getElementById('postQuote').value.trim();if(!content)return;const r=await(await fetch('/api/posts',{method:'POST',headers:headers(),body:JSON.stringify({novelId:currentNovel,content,quoteText:quote||null})})).json();if(r.code!==200)return alert(r.msg);document.getElementById('postContent').value='';document.getElementById('postQuote').value='';loadPosts();loadNovels()}
+async function toggleLike(id){await fetch(`/api/posts/${id}/like`,{method:'POST',headers:headers()});loadPosts()}
+async function toggleFav(id){const r=await(await fetch(`/api/posts/${id}/favorite`,{method:'POST',headers:headers()})).json();alert(r.data.favorited?'已收藏':'已取消收藏')}
+async function deletePost(id){if(!confirm('确定删除？'))return;await fetch(`/api/posts/${id}`,{method:'DELETE',headers:headers()});loadPosts();loadNovels()}
+async function reportPost(id){const reason=prompt('举报理由：');if(!reason)return;const r=await(await fetch('/api/reports',{method:'POST',headers:headers(),body:JSON.stringify({targetType:'post',targetId:id,reason})})).json();alert(r.code===200?'举报成功':r.msg)}
+async function blockUser(id){if(String(id)===String(myUserId))return;const r=await(await fetch(`/api/users/${id}/block`,{method:'POST',headers:headers()})).json();if(r.code===200){alert(r.data.blocked?'已屏蔽':'已取消屏蔽');loadPosts()}}
+async function doSearch(){const q=document.getElementById('searchInput').value.trim();if(!q)return;const{data}=await(await fetch(`/api/posts/search?q=${encodeURIComponent(q)}&novelId=${currentNovel||''}&page=1&size=20`)).json();document.getElementById('feed').innerHTML=data.list.map(renderPost).join('');data.list.forEach(p=>loadComments(p.id));document.getElementById('pagination').innerHTML=''}
 
 // ===== 评论 =====
-async function loadComments(postId) {
-    const res = await fetch(`/api/comments?postId=${postId}`);
-    const { data } = await res.json();
-    const list = document.getElementById(`clist-${postId}`);
-    if (!list) return;
-    list.innerHTML = (data || []).map(c => {
-        const reply = c.replyTo ? `<span class="c-reply">回复 @${esc(c.replyTo)}：</span>` : '';
-        return `<div class="comment-item"><span class="c-nick">${esc(c.nickname)}</span> ${reply}${esc(c.content)} <span class="c-reply-btn" onclick="setReply(${postId},'${esc(c.nickname)}')">回复</span></div>`;
-    }).join('');
-}
+async function loadComments(postId){const{data}=await(await fetch(`/api/comments?postId=${postId}&page=1&size=50`)).json();const el=document.getElementById(`clist-${postId}`);if(!el)return;el.innerHTML=(data.list||[]).map(c=>{const reply=c.replyTo?`<span class="c-reply">回复 @${esc(c.replyTo)}：</span>`:'';return `<div class="comment-item"><span class="c-nick">${esc(c.nickname)}</span> ${reply}${esc(c.content)} <span class="c-reply-btn" onclick="setReply(${postId},'${esc(c.nickname)}')">回复</span></div>`}).join('')}
+function setReply(postId,nick){currentReplyTo[postId]=nick;const i=document.getElementById(`cinput-${postId}`);i.placeholder=`回复 @${nick}...`;i.focus()}
+async function submitComment(postId){const input=document.getElementById(`cinput-${postId}`);const content=input.value.trim();if(!content)return;const replyTo=currentReplyTo[postId]||null;const r=await(await fetch('/api/comments',{method:'POST',headers:headers(),body:JSON.stringify({postId,content,replyTo})})).json();if(r.code!==200)return alert(r.msg);input.value='';input.placeholder='写评论...';delete currentReplyTo[postId];loadComments(postId);loadPosts()}
 
-function setReply(postId, nick) {
-    currentReplyTo[postId] = nick;
-    const input = document.getElementById(`cinput-${postId}`);
-    input.placeholder = `回复 @${nick}...`;
-    input.focus();
-}
+// ===== 个人中心 =====
+async function saveProfile(){const nickname=document.getElementById('editNickname').value.trim(),avatar=document.getElementById('editAvatar').value.trim(),bio=document.getElementById('editBio').value.trim();const r=await(await fetch('/api/users/me',{method:'PUT',headers:headers(),body:JSON.stringify({nickname,avatar,bio})})).json();if(r.code===200){token=r.data.token;myNick=r.data.nickname;localStorage.setItem('token',token);localStorage.setItem('nickname',myNick);document.getElementById('displayNick').textContent=myNick;alert('保存成功')}else alert(r.msg)}
+async function changePassword(){const oldPwd=prompt('旧密码：');if(!oldPwd)return;const newPwd=prompt('新密码（至少6位）：');if(!newPwd)return;const r=await(await fetch('/api/users/me/password',{method:'PUT',headers:headers(),body:JSON.stringify({oldPassword:oldPwd,newPassword:newPwd})})).json();alert(r.code===200?'修改成功':r.msg)}
+async function showMyTab(tab,btn){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));if(btn)btn.classList.add('active');const el=document.getElementById('myContent');const url=tab==='posts'?'/api/users/me/posts':tab==='comments'?'/api/users/me/comments':'/api/users/me/favorites';const{data}=await(await fetch(url+'?page=1&size=20',{headers:headers()})).json();if(!data.list||data.list.length===0){el.innerHTML='<div class="empty">暂无内容</div>';return}if(tab==='comments'){el.innerHTML=data.list.map(c=>`<div class="post-card" style="padding:10px"><div class="comment-item">${esc(c.content)}</div></div>`).join('')}else{el.innerHTML=data.list.map(p=>`<div class="post-card" style="padding:10px"><div class="post-content">${esc(p.content)}</div></div>`).join('')}}
+async function viewUser(id){const{data}=await(await fetch(`/api/users/${id}`)).json();if(!data)return;alert(`${data.nickname}\n${data.bio||'这个人很懒，什么都没写'}\n帖子数：${data.posts?data.posts.length:0}`)}
 
-async function submitComment(postId) {
-    const input = document.getElementById(`cinput-${postId}`);
-    const content = input.value.trim();
-    if (!content) return;
-    const replyTo = currentReplyTo[postId] || null;
-    await fetch('/api/comments', { method: 'POST', headers: headers(), body: JSON.stringify({ postId, content, replyTo }) });
-    input.value = '';
-    input.placeholder = '写评论...';
-    delete currentReplyTo[postId];
-    loadComments(postId);
-    loadPosts();
-}
-
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+// ===== 通知 =====
+async function loadUnread(){const{data}=await(await fetch('/api/notifications/unread-count',{headers:headers()})).json();const badge=document.getElementById('unreadBadge');if(data.count>0){badge.textContent=data.count;badge.classList.remove('hidden')}else badge.classList.add('hidden')}
+async function loadNotifs(){const{data}=await(await fetch('/api/notifications?page=1&size=30',{headers:headers()})).json();const el=document.getElementById('notifList');if(!data.list||data.list.length===0){el.innerHTML='<div class="empty">暂无通知</div>';return}el.innerHTML=data.list.map(n=>`<div class="notif-item ${n.isRead?'':'unread'}">${esc(n.content)}<div class="notif-time">${new Date(n.createdAt).toLocaleString('zh-CN')}</div></div>`).join('')}
+async function readAllNotif(){await fetch('/api/notifications/read-all',{method:'PUT',headers:headers()});loadNotifs();loadUnread()}
 
 // ===== 初始化 =====
-if (token) { enterMain(); } 
+if(token)enterMain();
 </script>
 </body>
 </html>
