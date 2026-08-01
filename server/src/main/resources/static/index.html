@@ -82,9 +82,13 @@
         .notif-item.unread{background:rgba(88,166,255,.05)}
         .notif-time{font-size:11px;color:var(--dim)}
         .empty{text-align:center;color:var(--dim);padding:30px;font-size:14px}
+        /* toast */
+        .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 24px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none}
+        .toast.show{opacity:1}
     </style>
 </head>
 <body>
+<div class="toast" id="toast"></div>
 <div class="container">
     <h1>拼象</h1>
     <p class="subtitle">一千个读者，拼出一头完整的大象</p>
@@ -165,6 +169,8 @@ let currentNovel=null, currentSort='new', currentPage=1, isRegister=false, curre
 
 function headers(){const h={'Content-Type':'application/json'};if(token)h['Authorization']='Bearer '+token;return h}
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500)}
+async function api(url,opts={}){opts.headers=opts.headers||headers();const r=await fetch(url,opts);if(r.status===401){token='';myNick='';myUserId='';localStorage.clear();refreshTopBar();showAuth();toast('登录已过期，请重新登录');return{code:401}}return r.json()}
 
 // ===== 认证 =====
 function toggleAuthMode(){isRegister=!isRegister;document.getElementById('authTitle').textContent=isRegister?'注册':'登录';document.getElementById('authBtn').textContent=isRegister?'注册':'登录';document.getElementById('authNickname').classList.toggle('hidden',!isRegister);document.getElementById('authSwitch').innerHTML=isRegister?'已有账号？<a onclick="toggleAuthMode()">登录</a>':'没有账号？<a onclick="toggleAuthMode()">注册</a>';document.getElementById('authError').style.display='none'}
@@ -191,23 +197,23 @@ function goPage(p){currentPage=p;loadPosts()}
 function renderPost(p){const time=new Date(p.createdAt).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});const quote=p.quoteText?`<div class="post-quote">「${esc(p.quoteText)}」</div>`:'';const pin=p.pinned?'<span class="tag-pin">[置顶]</span>':'';const feat=p.featured?'<span class="tag-feat">[精]</span>':'';const del=(String(p.userId)===String(myUserId))?`<span onclick="deletePost(${p.id})">删除</span> <span onclick="editPost(${p.id},'${esc(p.content).replace(/'/g,"\\'")}')">编辑</span>`:'';const lvTitles=['新读者','书友','活跃书友','资深书友','学者'];const lv=`<span style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:3px;padding:0 3px;margin-left:4px">Lv.${p.level||0} ${lvTitles[p.level||0]}</span>`;return `<div class="post-card"><div class="post-header"><span>${pin}${feat} <span class="post-nick" onclick="viewUser(${p.userId})">${esc(p.nickname)}</span>${lv}</span><span class="post-time">${time}</span></div><div class="post-content">${esc(p.content)}</div>${quote}<div class="post-actions"><span onclick="toggleLike(${p.id})">❤ ${p.likeCount||0}</span><span>💬 ${p.commentCount||0}</span><span onclick="toggleFav(${p.id})">⭐ 收藏</span><span onclick="reportPost(${p.id})">举报</span><span onclick="blockUser(${p.userId})">屏蔽</span>${del}</div><div class="comments"><div id="clist-${p.id}"></div><div class="comment-form"><input id="cinput-${p.id}" placeholder="写评论..." onkeydown="if(event.key==='Enter')submitComment(${p.id})"><button class="btn btn-sm" onclick="submitComment(${p.id})">发送</button></div></div></div>`}
 
 // ===== 帖子操作 =====
-async function submitPost(){if(!requireAuth())return;const content=document.getElementById('postContent').value.trim(),quote=document.getElementById('postQuote').value.trim();if(!content)return;const r=await(await fetch('/api/posts',{method:'POST',headers:headers(),body:JSON.stringify({novelId:currentNovel,content,quoteText:quote||null})})).json();if(r.code!==200)return alert(r.msg);document.getElementById('postContent').value='';document.getElementById('postQuote').value='';loadPosts();loadNovels()}
+async function submitPost(){if(!requireAuth())return;const content=document.getElementById('postContent').value.trim(),quote=document.getElementById('postQuote').value.trim();if(!content)return;const r=await api('/api/posts',{method:'POST',body:JSON.stringify({novelId:currentNovel,content,quoteText:quote||null})});if(r.code!==200)return toast(r.msg);document.getElementById('postContent').value='';document.getElementById('postQuote').value='';loadPosts();loadNovels()}
 async function toggleLike(id){if(!requireAuth())return;await fetch(`/api/posts/${id}/like`,{method:'POST',headers:headers()});loadPosts()}
-async function toggleFav(id){if(!requireAuth())return;const r=await(await fetch(`/api/posts/${id}/favorite`,{method:'POST',headers:headers()})).json();alert(r.data.favorited?'已收藏':'已取消收藏')}
+async function toggleFav(id){if(!requireAuth())return;const r=await api(`/api/posts/${id}/favorite`,{method:'POST'});if(r.code===401)return;toast(r.data.favorited?'⭐ 已收藏':'已取消收藏')}
 async function deletePost(id){if(!confirm('确定删除？'))return;await fetch(`/api/posts/${id}`,{method:'DELETE',headers:headers()});loadPosts();loadNovels()}
-async function editPost(id,old){const content=prompt('编辑帖子：',old);if(content===null||content.trim()==='')return;const r=await(await fetch(`/api/posts/${id}`,{method:'PUT',headers:headers(),body:JSON.stringify({content:content.trim()})})).json();if(r.code===200)loadPosts();else alert(r.msg)}
-async function reportPost(id){if(!requireAuth())return;const reason=prompt('举报理由：');if(!reason)return;const r=await(await fetch('/api/reports',{method:'POST',headers:headers(),body:JSON.stringify({targetType:'post',targetId:id,reason})})).json();alert(r.code===200?'举报成功':r.msg)}
-async function blockUser(id){if(!requireAuth())return;if(String(id)===String(myUserId))return;const r=await(await fetch(`/api/users/${id}/block`,{method:'POST',headers:headers()})).json();if(r.code===200){alert(r.data.blocked?'已屏蔽':'已取消屏蔽');loadPosts()}}
+async function editPost(id,old){const content=prompt('编辑帖子：',old);if(content===null||content.trim()==='')return;const r=await api(`/api/posts/${id}`,{method:'PUT',body:JSON.stringify({content:content.trim()})});if(r.code===200){toast('已更新');loadPosts()}else if(r.code!==401)toast(r.msg)}
+async function reportPost(id){if(!requireAuth())return;const reason=prompt('举报理由：');if(!reason)return;const r=await api('/api/reports',{method:'POST',body:JSON.stringify({targetType:'post',targetId:id,reason})});if(r.code!==401)toast(r.code===200?'举报已提交':r.msg)}
+async function blockUser(id){if(!requireAuth())return;if(String(id)===String(myUserId))return;const r=await api(`/api/users/${id}/block`,{method:'POST'});if(r.code===200){toast(r.data.blocked?'已屏蔽':'已取消屏蔽');loadPosts()}}
 async function doSearch(){const q=document.getElementById('searchInput').value.trim();if(!q)return;const{data}=await(await fetch(`/api/posts/search?q=${encodeURIComponent(q)}&novelId=${currentNovel||''}&page=1&size=20`)).json();document.getElementById('feed').innerHTML=data.list.map(renderPost).join('');data.list.forEach(p=>loadComments(p.id));document.getElementById('pagination').innerHTML=''}
 
 // ===== 评论 =====
 async function loadComments(postId){const{data}=await(await fetch(`/api/comments?postId=${postId}&page=1&size=50`)).json();const el=document.getElementById(`clist-${postId}`);if(!el)return;el.innerHTML=(data.list||[]).map(c=>{const reply=c.replyTo?`<span class="c-reply">回复 @${esc(c.replyTo)}：</span>`:'';return `<div class="comment-item"><span class="c-nick">${esc(c.nickname)}</span> ${reply}${esc(c.content)} <span class="c-reply-btn" onclick="setReply(${postId},'${esc(c.nickname)}')">回复</span></div>`}).join('')}
 function setReply(postId,nick){currentReplyTo[postId]=nick;const i=document.getElementById(`cinput-${postId}`);i.placeholder=`回复 @${nick}...`;i.focus()}
-async function submitComment(postId){if(!requireAuth())return;const input=document.getElementById(`cinput-${postId}`);const content=input.value.trim();if(!content)return;const replyTo=currentReplyTo[postId]||null;const r=await(await fetch('/api/comments',{method:'POST',headers:headers(),body:JSON.stringify({postId,content,replyTo})})).json();if(r.code!==200)return alert(r.msg);input.value='';input.placeholder='写评论...';delete currentReplyTo[postId];loadComments(postId);loadPosts()}
+async function submitComment(postId){if(!requireAuth())return;const input=document.getElementById(`cinput-${postId}`);const content=input.value.trim();if(!content)return;const replyTo=currentReplyTo[postId]||null;const r=await api('/api/comments',{method:'POST',body:JSON.stringify({postId,content,replyTo})});if(r.code!==200){if(r.code!==401)toast(r.msg);return}input.value='';input.placeholder='写评论...';delete currentReplyTo[postId];loadComments(postId);loadPosts()}
 
 // ===== 个人中心 =====
-async function saveProfile(){const nickname=document.getElementById('editNickname').value.trim(),avatar=document.getElementById('editAvatar').value.trim(),bio=document.getElementById('editBio').value.trim();const r=await(await fetch('/api/users/me',{method:'PUT',headers:headers(),body:JSON.stringify({nickname,avatar,bio})})).json();if(r.code===200){token=r.data.token;myNick=r.data.nickname;localStorage.setItem('token',token);localStorage.setItem('nickname',myNick);refreshTopBar();alert('保存成功')}else alert(r.msg)}
-async function changePassword(){const oldPwd=prompt('旧密码：');if(!oldPwd)return;const newPwd=prompt('新密码（至少6位）：');if(!newPwd)return;const r=await(await fetch('/api/users/me/password',{method:'PUT',headers:headers(),body:JSON.stringify({oldPassword:oldPwd,newPassword:newPwd})})).json();alert(r.code===200?'修改成功':r.msg)}
+async function saveProfile(){const nickname=document.getElementById('editNickname').value.trim(),avatar=document.getElementById('editAvatar').value.trim(),bio=document.getElementById('editBio').value.trim();const r=await api('/api/users/me',{method:'PUT',body:JSON.stringify({nickname,avatar,bio})});if(r.code===200){token=r.data.token;myNick=r.data.nickname;localStorage.setItem('token',token);localStorage.setItem('nickname',myNick);refreshTopBar();toast('保存成功')}else if(r.code!==401)toast(r.msg)}
+async function changePassword(){const oldPwd=prompt('旧密码：');if(!oldPwd)return;const newPwd=prompt('新密码（至少6位）：');if(!newPwd)return;const r=await api('/api/users/me/password',{method:'PUT',body:JSON.stringify({oldPassword:oldPwd,newPassword:newPwd})});if(r.code!==401)toast(r.code===200?'修改成功':r.msg)}
 async function showMyTab(tab,btn){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));if(btn)btn.classList.add('active');const el=document.getElementById('myContent');const url=tab==='posts'?'/api/users/me/posts':tab==='comments'?'/api/users/me/comments':'/api/users/me/favorites';const{data}=await(await fetch(url+'?page=1&size=20',{headers:headers()})).json();if(!data.list||data.list.length===0){el.innerHTML='<div class="empty">暂无内容</div>';return}if(tab==='comments'){el.innerHTML=data.list.map(c=>`<div class="post-card" style="padding:10px"><div class="comment-item">${esc(c.content)}</div></div>`).join('')}else{el.innerHTML=data.list.map(p=>`<div class="post-card" style="padding:10px"><div class="post-content">${esc(p.content)}</div></div>`).join('')}}
 async function viewUser(id){const{data}=await(await fetch(`/api/users/${id}`)).json();if(!data)return;alert(`${data.nickname}\n${data.bio||'这个人很懒，什么都没写'}\n帖子数：${data.posts?data.posts.length:0}`)}
 
@@ -223,6 +229,7 @@ function hideAuth(){document.getElementById('authSection').classList.add('hidden
 function requireAuth(){if(!token){showAuth();return false}return true}
 refreshTopBar();loadNovels();
 if(token){loadUnread()}
+setInterval(()=>{if(token)loadUnread()},30000)
 </script>
 </body>
 </html>
