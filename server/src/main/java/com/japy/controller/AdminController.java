@@ -7,6 +7,7 @@ import com.japy.common.*;
 import com.japy.entity.*;
 import com.japy.mapper.*;
 import com.japy.service.NotificationService;
+import com.japy.service.PointsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +27,7 @@ public class AdminController {
     private final NotificationMapper notificationMapper;
     private final OperationLogMapper logMapper;
     private final NotificationService notificationService;
+    private final PointsService pointsService;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     private void log(String action, String targetType, Long targetId, String detail) {
@@ -120,6 +122,7 @@ public class AdminController {
         Post p = postMapper.selectById(id);
         if (p != null && p.getUserId() != null) {
             notificationService.send(p.getUserId(), "hidden", "post", id, "你的帖子已被管理员隐藏");
+            pointsService.earn(p.getUserId(), "penalty", -5);
         }
         log("hide_post", "post", id, null);
         return R.ok();
@@ -156,6 +159,10 @@ public class AdminController {
     @PutMapping("/posts/{id}/feature")
     public R<Void> featurePost(@PathVariable Long id) {
         postMapper.update(null, new LambdaUpdateWrapper<Post>().eq(Post::getId, id).set(Post::getFeatured, 1));
+        Post p = postMapper.selectById(id);
+        if (p != null && p.getUserId() != null) {
+            pointsService.earn(p.getUserId(), "featured", 10);
+        }
         log("feature_post", "post", id, null);
         return R.ok();
     }

@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS user (
     avatar VARCHAR(255),
     bio VARCHAR(200),
     role VARCHAR(20) DEFAULT 'user' COMMENT 'user/admin',
+    points INT DEFAULT 0,
+    level INT DEFAULT 0,
     status TINYINT DEFAULT 0 COMMENT '0=正常 1=封禁',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -122,4 +124,13 @@ CREATE TABLE IF NOT EXISTS operation_log (
     target_id BIGINT,
     detail VARCHAR(500),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS points_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    action VARCHAR(30) NOT NULL COMMENT 'post/liked/comment/comment_liked/featured/penalty',
+    points INT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_user_date (user_id, created_at)
 );

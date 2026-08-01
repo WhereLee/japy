@@ -9,6 +9,7 @@ import com.japy.mapper.CommentMapper;
 import com.japy.mapper.PostMapper;
 import com.japy.service.CommentService;
 import com.japy.service.NotificationService;
+import com.japy.service.PointsService;
 import com.japy.service.PostService;
 import com.japy.service.SensitiveWordService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class CommentController {
     private final SensitiveWordService sensitiveWordService;
     private final NotificationService notificationService;
     private final PostMapper postMapper;
+    private final PointsService pointsService;
 
     @GetMapping
     public R<PageResult<Comment>> list(
@@ -48,6 +50,8 @@ public class CommentController {
         comment.setNickname(UserContext.getNickname());
         Comment saved = commentService.create(comment);
         postService.incrementCommentCount(comment.getPostId());
+        // 积分：发评论+1
+        pointsService.earn(comment.getUserId(), "comment", 1);
         // 通知帖子作者
         Post post = postMapper.selectById(comment.getPostId());
         if (post != null && post.getUserId() != null && !post.getUserId().equals(UserContext.getUserId())) {

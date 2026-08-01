@@ -9,6 +9,7 @@ import com.japy.entity.User;
 import com.japy.mapper.CommentMapper;
 import com.japy.mapper.PostMapper;
 import com.japy.mapper.UserMapper;
+import com.japy.service.PointsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +25,25 @@ public class UserController {
     private final UserMapper userMapper;
     private final PostMapper postMapper;
     private final CommentMapper commentMapper;
+    private final PointsService pointsService;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+
+    /** 我的积分信息 */
+    @GetMapping("/me/points")
+    public R<Map<String, Object>> myPoints() {
+        Long userId = UserContext.getUserId();
+        User user = userMapper.selectById(userId);
+        int points = user.getPoints() == null ? 0 : user.getPoints();
+        int level = user.getLevel() == null ? 0 : user.getLevel();
+        int next = PointsService.nextThreshold(level);
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("points", points);
+        info.put("level", level);
+        info.put("title", PointsService.levelTitle(level));
+        info.put("nextThreshold", next);
+        info.put("progress", next > 0 ? points * 100 / next : 100);
+        return R.ok(info);
+    }
 
     /** 修改个人资料（昵称/头像/简介），重签 token */
     @PutMapping("/me")

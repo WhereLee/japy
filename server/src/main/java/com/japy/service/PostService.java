@@ -6,10 +6,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.japy.common.PageResult;
 import com.japy.entity.Post;
 import com.japy.entity.PostLike;
+import com.japy.entity.User;
 import com.japy.entity.UserBlock;
 import com.japy.mapper.PostLikeMapper;
 import com.japy.mapper.PostMapper;
 import com.japy.mapper.UserBlockMapper;
+import com.japy.mapper.UserMapper;
 import com.japy.common.UserContext;
 import com.japy.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +28,9 @@ public class PostService {
     private final PostMapper postMapper;
     private final PostLikeMapper likeMapper;
     private final UserBlockMapper blockMapper;
+    private final UserMapper userMapper;
     private final NotificationService notificationService;
+    private final PointsService pointsService;
 
     /**
      * 分页查询帖子（仅正常状态）
@@ -61,6 +65,13 @@ public class PostService {
         }
 
         Page<Post> result = postMapper.selectPage(p, wrapper);
+        // 填充作者等级
+        for (Post post : result.getRecords()) {
+            if (post.getUserId() != null) {
+                User u = userMapper.selectById(post.getUserId());
+                if (u != null) post.setLevel(u.getLevel() == null ? 0 : u.getLevel());
+            }
+        }
         return PageResult.of(result.getRecords(), result.getTotal(), page, size);
     }
 
@@ -71,6 +82,8 @@ public class PostService {
         post.setPinned(0);
         post.setFeatured(0);
         postMapper.insert(post);
+        // 积分：发帖+1
+        pointsService.earn(post.getUserId(), "post", 1);
         return post;
     }
 
@@ -108,6 +121,8 @@ public class PostService {
             if (post.getUserId() != null && !post.getUserId().equals(UserContext.getUserId())) {
                 notificationService.send(post.getUserId(), "like", "post", postId,
                         UserContext.getNickname() + " 赞了你的帖子");
+                // 积分：被赞+2
+                pointsService.earn(post.getUserId(), "liked", 2);
             }
             return true;
         }

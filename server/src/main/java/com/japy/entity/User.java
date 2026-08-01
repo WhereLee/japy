@@ -15,6 +15,8 @@ public class User {
     private String avatar;
     private String bio;
     private String role;
+    private Integer points;
+    private Integer level;
     private Integer status;
     private LocalDateTime createdAt;
 }

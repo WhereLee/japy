@@ -20,4 +20,9 @@ public class Post {
     private Integer pinned;
     private Integer featured;
     private LocalDateTime createdAt;
+
+    @TableField(exist = false)
+    private Boolean liked;
+    @TableField(exist = false)
+    private Integer level;
 }
