@@ -8,9 +8,9 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface PointsLogMapper extends BaseMapper<PointsLog> {
 
-    @Select("SELECT COALESCE(SUM(points),0) FROM points_log WHERE user_id=#{userId} AND action IN ('post','comment') AND DATE(created_at)=CURDATE()")
+    @Select("SELECT COALESCE(SUM(points),0) FROM points_log WHERE user_id=#{userId} AND action IN ('post','comment') AND created_at::date = CURRENT_DATE")
     int todayContributionPoints(Long userId);
 
-    @Select("SELECT COALESCE(SUM(points),0) FROM points_log WHERE user_id=#{userId} AND action IN ('liked','comment_liked','featured') AND DATE(created_at)=CURDATE()")
+    @Select("SELECT COALESCE(SUM(points),0) FROM points_log WHERE user_id=#{userId} AND action IN ('liked','comment_liked','featured') AND created_at::date = CURRENT_DATE")
     int todayRecognitionPoints(Long userId);
 }
