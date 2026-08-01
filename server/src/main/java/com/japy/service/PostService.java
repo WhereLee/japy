@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -65,11 +66,16 @@ public class PostService {
         }
 
         Page<Post> result = postMapper.selectPage(p, wrapper);
-        // 填充作者等级
-        for (Post post : result.getRecords()) {
-            if (post.getUserId() != null) {
-                User u = userMapper.selectById(post.getUserId());
-                if (u != null) post.setLevel(u.getLevel() == null ? 0 : u.getLevel());
+        // 批量填充作者等级（避免 N+1）
+        List<Long> userIds = result.getRecords().stream()
+                .map(Post::getUserId).filter(java.util.Objects::nonNull).distinct().collect(Collectors.toList());
+        if (!userIds.isEmpty()) {
+            Map<Long, Integer> levelMap = userMapper.selectBatchIds(userIds).stream()
+                    .collect(Collectors.toMap(User::getId, u -> u.getLevel() == null ? 0 : u.getLevel()));
+            for (Post post : result.getRecords()) {
+                if (post.getUserId() != null) {
+                    post.setLevel(levelMap.getOrDefault(post.getUserId(), 0));
+                }
             }
         }
         return PageResult.of(result.getRecords(), result.getTotal(), page, size);

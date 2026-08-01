@@ -50,7 +50,7 @@ public class PostController {
     @PutMapping("/{id}")
     public R<Void> edit(@PathVariable Long id, @RequestBody Map<String, String> body) {
         Post post = postMapper.selectById(id);
-        if (post == null) return R.fail("帖子不存在");
+        if (post == null || post.getStatus() != 0) return R.fail("帖子不存在");
         if (!post.getUserId().equals(UserContext.getUserId())) return R.fail("只能编辑自己的帖子");
         String content = body.get("content");
         if (content == null || content.isBlank()) return R.fail("内容不能为空");
@@ -87,9 +87,11 @@ public class PostController {
             @RequestParam(required = false) Long novelId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
+        if (q == null || q.isBlank()) return R.fail("搜索关键词不能为空");
+        final String keyword = q.length() > 50 ? q.substring(0, 50) : q;
         LambdaQueryWrapper<Post> w = new LambdaQueryWrapper<Post>()
                 .eq(Post::getStatus, 0)
-                .and(wrapper -> wrapper.like(Post::getContent, q).or().like(Post::getQuoteText, q));
+                .and(wrapper -> wrapper.like(Post::getContent, keyword).or().like(Post::getQuoteText, keyword));
         if (novelId != null) w.eq(Post::getNovelId, novelId);
         w.orderByDesc(Post::getCreatedAt);
         Page<Post> result = postMapper.selectPage(new Page<>(page, size), w);

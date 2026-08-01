@@ -6,6 +6,7 @@ import com.japy.mapper.PointsLogMapper;
 import com.japy.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -23,9 +24,10 @@ public class PointsService {
     private static final String[] LEVEL_TITLES = {"新读者", "书友", "活跃书友", "资深书友", "学者"};
 
     /**
-     * 加分（带上限检查）
+     * 加分（带上限检查，原子更新防并发）
      * @param action post/comment/liked/comment_liked/featured/penalty
      */
+    @Transactional
     public void earn(Long userId, String action, int points) {
         if (userId == null) return;
 
@@ -51,13 +53,14 @@ public class PointsService {
         log.setPoints(points);
         pointsLogMapper.insert(log);
 
-        // 更新用户积分和等级
+        // 原子更新积分（避免并发丢失更新）
+        userMapper.addPoints(userId, points);
+        // 重新计算等级
         User user = userMapper.selectById(userId);
-        if (user == null) return;
-        int newPoints = Math.max(0, (user.getPoints() == null ? 0 : user.getPoints()) + points);
-        user.setPoints(newPoints);
-        user.setLevel(calcLevel(newPoints));
-        userMapper.updateById(user);
+        if (user != null) {
+            user.setLevel(calcLevel(user.getPoints() == null ? 0 : user.getPoints()));
+            userMapper.updateById(user);
+        }
     }
 
     public static int calcLevel(int points) {

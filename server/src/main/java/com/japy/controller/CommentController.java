@@ -44,6 +44,11 @@ public class CommentController {
         if (comment.getPostId() == null) {
             return R.fail("帖子ID不能为空");
         }
+        // 检查帖子是否存在且正常
+        Post targetPost = postMapper.selectById(comment.getPostId());
+        if (targetPost == null || targetPost.getStatus() != 0) {
+            return R.fail("帖子不存在");
+        }
         String hit = sensitiveWordService.check(comment.getContent());
         if (hit != null) return R.fail("内容包含敏感词：" + hit);
         comment.setUserId(UserContext.getUserId());
