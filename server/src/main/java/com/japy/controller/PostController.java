@@ -47,6 +47,21 @@ public class PostController {
         return R.ok(postService.create(post));
     }
 
+    @PutMapping("/{id}")
+    public R<Void> edit(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        Post post = postMapper.selectById(id);
+        if (post == null) return R.fail("帖子不存在");
+        if (!post.getUserId().equals(UserContext.getUserId())) return R.fail("只能编辑自己的帖子");
+        String content = body.get("content");
+        if (content == null || content.isBlank()) return R.fail("内容不能为空");
+        String hit = sensitiveWordService.check(content);
+        if (hit != null) return R.fail("内容包含敏感词：" + hit);
+        post.setContent(content);
+        if (body.containsKey("quoteText")) post.setQuoteText(body.get("quoteText"));
+        postMapper.updateById(post);
+        return R.ok();
+    }
+
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable Long id) {
         Post post = postMapper.selectById(id);
