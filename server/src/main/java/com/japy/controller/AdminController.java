@@ -174,6 +174,15 @@ public class AdminController {
         return R.ok();
     }
 
+    @GetMapping("/comments")
+    public R<PageResult<Comment>> listComments(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Page<Comment> p = commentMapper.selectPage(new Page<>(page, size),
+                new LambdaQueryWrapper<Comment>().orderByDesc(Comment::getId));
+        return R.ok(PageResult.of(p.getRecords(), p.getTotal(), page, size));
+    }
+
     @PutMapping("/comments/{id}/restore")
     public R<Void> restoreComment(@PathVariable Long id) {
         commentMapper.update(null, new LambdaUpdateWrapper<Comment>().eq(Comment::getId, id).set(Comment::getStatus, 0));
