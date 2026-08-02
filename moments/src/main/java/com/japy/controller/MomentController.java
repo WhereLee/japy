@@ -7,6 +7,7 @@ import com.japy.common.UserContext;
 import com.japy.entity.Moment;
 import com.japy.entity.MomentLike;
 import com.japy.mapper.MomentMapper;
+import com.japy.mapper.NovelMapper;
 import com.japy.service.MomentService;
 import com.japy.service.SensitiveWordService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class MomentController {
 
     private final MomentService momentService;
     private final MomentMapper momentMapper;
+    private final NovelMapper novelMapper;
     private final SensitiveWordService sensitiveWordService;
 
     /**
@@ -39,7 +41,7 @@ public class MomentController {
         return R.ok(momentService.list(PageParams.page(page), PageParams.size(size), UserContext.getUserId()));
     }
 
-    /** 发动态 */
+    /** 发动态（可关联小说：novelId 可选） */
     @PostMapping
     public R<Moment> create(@RequestBody Map<String, String> body) {
         String content = body.get("content");
@@ -47,7 +49,19 @@ public class MomentController {
         if (content.length() > 2000) return R.fail("内容过长（最多2000字）");
         String hit = sensitiveWordService.check(content);
         if (hit != null) return R.fail("内容包含敏感词：" + hit);
-        Moment moment = momentService.create(UserContext.getUserId(), UserContext.getNickname(), content);
+        // 关联小说（可选）：校验存在
+        Long novelId = null;
+        if (body.get("novelId") != null && !body.get("novelId").isBlank()) {
+            try {
+                novelId = Long.valueOf(body.get("novelId"));
+            } catch (NumberFormatException e) {
+                return R.fail("novelId 格式错误");
+            }
+            if (novelMapper.selectById(novelId) == null) {
+                return R.fail("关联的小说不存在");
+            }
+        }
+        Moment moment = momentService.create(UserContext.getUserId(), UserContext.getNickname(), content, novelId);
         return R.ok(moment);
     }
 

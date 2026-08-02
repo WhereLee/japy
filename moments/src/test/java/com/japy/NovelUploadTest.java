@@ -274,6 +274,42 @@ public class NovelUploadTest extends TestBase {
 
     @Test
     @Order(10)
+    void publishMomentWithNovelLink() throws Exception {
+        String token = login(PREFIX + "_admin", "123456");
+        Novel novel = novelMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Novel>()
+                .eq(Novel::getTitle, "测试小说"));
+        assertNotNull(novel);
+
+        // 发布动态并关联小说
+        MvcResult r = postJson("/api/moments", token,
+                "{\"content\":\"关联小说测试\",\"novelId\":" + novel.getId() + "}");
+        assertEquals(200, body(r).get("code").asInt(), body(r).toString());
+        JsonNode created = body(r).get("data");
+        assertEquals(novel.getId().longValue(), created.get("novelId").asLong());
+        long momentId = created.get("id").asLong();
+
+        // 时间线返回 novelTitle
+        MvcResult tl = getReq("/api/moments?page=1&size=5", token);
+        JsonNode list = body(tl).get("data").get("list");
+        boolean found = false;
+        for (JsonNode m : list) {
+            if ("关联小说测试".equals(m.get("content").asText())) {
+                assertEquals("测试小说", m.get("novelTitle").asText());
+                found = true;
+            }
+        }
+        assertTrue(found, "时间线应返回关联小说名");
+
+        // 关联不存在的小说 → 400
+        assertEquals(400, body(postJson("/api/moments", token,
+                "{\"content\":\"x\",\"novelId\":999999}")).get("code").asInt());
+
+        // 清理测试动态
+        assertEquals(200, body(deleteReq("/api/moments/" + momentId, token)).get("code").asInt());
+    }
+
+    @Test
+    @Order(11)
     void cleanupDatabase() {
         // 清理测试小说数据（目录由 @AfterAll 清理），避免污染开发库
         Novel novel = novelMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Novel>()

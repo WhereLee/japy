@@ -15,7 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -26,6 +29,7 @@ public class MomentService {
     private final MomentMapper momentMapper;
     private final MomentLikeMapper likeMapper;
     private final CommentMapper commentMapper;
+    private final com.japy.mapper.NovelMapper novelMapper;
     private final NotificationService notificationService;
 
     /**
@@ -40,6 +44,8 @@ public class MomentService {
                 .orderByDesc(Moment::getId);
         Page<Moment> result = momentMapper.selectPage(p, wrapper);
         fillLikedState(result.getRecords(), currentUserId);
+        fillLikedBy(result.getRecords());
+        fillNovel(result.getRecords());
         return PageResult.of(result.getRecords(), result.getTotal(), page, size);
     }
 
@@ -69,6 +75,8 @@ public class MomentService {
                         .orderByDesc(Moment::getId)
                         .last("LIMIT " + size)); // size 已由 PageParams 规整为 int
         fillLikedState(records, currentUserId);
+        fillLikedBy(records);
+        fillNovel(records);
         // 游标模式无 total 语义，返回本页条数
         return PageResult.of(records, records.size(), 1, size);
     }
@@ -85,6 +93,8 @@ public class MomentService {
                 .orderByDesc(Moment::getId);
         Page<Moment> result = momentMapper.selectPage(p, wrapper);
         fillLikedState(result.getRecords(), currentUserId);
+        fillLikedBy(result.getRecords());
+        fillNovel(result.getRecords());
         return PageResult.of(result.getRecords(), result.getTotal(), page, size);
     }
 
@@ -100,14 +110,17 @@ public class MomentService {
                 .orderByDesc(Moment::getId);
         Page<Moment> result = momentMapper.selectPage(p, wrapper);
         fillLikedState(result.getRecords(), userId);
+        fillLikedBy(result.getRecords());
+        fillNovel(result.getRecords());
         return PageResult.of(result.getRecords(), result.getTotal(), page, size);
     }
 
-    public Moment create(Long userId, String nickname, String content) {
+    public Moment create(Long userId, String nickname, String content, Long novelId) {
         Moment moment = new Moment();
         moment.setUserId(userId);
         moment.setNickname(nickname);
         moment.setContent(content);
+        moment.setNovelId(novelId);
         moment.setLikeCount(0);
         moment.setCommentCount(0);
         moment.setStatus(0);
@@ -189,6 +202,25 @@ public class MomentService {
         return PageResult.of(result.getRecords(), result.getTotal(), page, size);
     }
 
+    /**
+     * 批量填充关联小说名（首页"说说+小说"展示）。一次 IN 查询无 N+1。
+     */
+    private void fillNovel(List<Moment> records) {
+        List<Long> novelIds = records.stream()
+                .map(Moment::getNovelId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (novelIds.isEmpty()) return;
+        Map<Long, String> titles = novelMapper.selectBatchIds(novelIds).stream()
+                .collect(Collectors.toMap(com.japy.entity.Novel::getId, com.japy.entity.Novel::getTitle));
+        for (Moment m : records) {
+            if (m.getNovelId() != null) {
+                m.setNovelTitle(titles.get(m.getNovelId()));
+            }
+        }
+    }
+
     /** 批量填充当前用户点赞状态（避免N+1） */
     private void fillLikedState(List<Moment> records, Long currentUserId) {
         if (currentUserId == null || records.isEmpty()) return;
@@ -200,6 +232,33 @@ public class MomentService {
                 .stream().map(MomentLike::getMomentId).collect(Collectors.toSet());
         for (Moment m : records) {
             m.setLiked(likedIds.contains(m.getId()));
+        }
+    }
+
+    /**
+     * 批量填充点赞者（每条约前 5 个，QQ空间式"XX、XX…等 N 人觉得很赞"）。
+     * 返回 userId+nickname 以便前端点击昵称跳转个人页；一次 IN 查询无 N+1。
+     */
+    private void fillLikedBy(List<Moment> records) {
+        if (records.isEmpty()) return;
+        List<Long> ids = records.stream().map(Moment::getId).collect(Collectors.toList());
+        List<MomentLike> likes = likeMapper.selectList(
+                new LambdaQueryWrapper<MomentLike>()
+                        .in(MomentLike::getMomentId, ids)
+                        .orderByDesc(MomentLike::getCreatedAt));
+        Map<Long, List<MomentLike>> byMoment = likes.stream().collect(Collectors.groupingBy(
+                MomentLike::getMomentId, LinkedHashMap::new, Collectors.toList()));
+        for (Moment m : records) {
+            List<MomentLike> list = byMoment.getOrDefault(m.getId(), List.of());
+            List<Map<String, Object>> users = new ArrayList<>();
+            for (int i = 0; i < Math.min(list.size(), 5); i++) {
+                MomentLike l = list.get(i);
+                Map<String, Object> u = new LinkedHashMap<>();
+                u.put("userId", l.getUserId());
+                u.put("nickname", l.getNickname());
+                users.add(u);
+            }
+            m.setLikedBy(users);
         }
     }
 }

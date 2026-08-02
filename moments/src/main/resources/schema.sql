@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS moment (
     user_id BIGINT NOT NULL,
     nickname VARCHAR(50) NOT NULL,      -- 发布时快照
     content TEXT NOT NULL,
+    novel_id BIGINT,                    -- 关联小说（可空，说说大厅/首页展示用）
     like_count INT DEFAULT 0,
     comment_count INT DEFAULT 0,
     status SMALLINT DEFAULT 0,          -- 0正常 1隐藏 2删除
@@ -31,6 +32,8 @@ CREATE TABLE IF NOT EXISTS moment (
 CREATE INDEX IF NOT EXISTS idx_moment_created ON moment(created_at);
 CREATE INDEX IF NOT EXISTS idx_moment_status ON moment(status);
 CREATE INDEX IF NOT EXISTS idx_moment_user ON moment(user_id);
+-- 兼容旧库
+ALTER TABLE moment ADD COLUMN IF NOT EXISTS novel_id BIGINT;
 
 -- 点赞（带赞过的人）
 CREATE TABLE IF NOT EXISTS moment_like (
