@@ -131,10 +131,11 @@ class ReportAdminTest extends TestBase {
 
     @Test @Order(24)
     void 强制改名后新昵称生效() throws Exception {
+        String tmpToken = registerOrLogin(PREFIX + "renamed", "pass123", "原名");
         var u = userMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.japy.entity.User>()
                         .eq(com.japy.entity.User::getUsername, PREFIX + "renamed"));
-        String tmpToken = registerOrLogin(PREFIX + "renamed", "pass123", "原名");
+        assertNotNull(u, "用户应先注册成功");
         assertEquals(200, body(putJson("/api/admin/users/" + u.getId() + "/nickname", tokenAdmin,
                 "{\"nickname\":\"被强改昵称\"}")).get("code").asInt());
         // 拦截器从库中取最新昵称 → 旧 token 发动态也显示新昵称
