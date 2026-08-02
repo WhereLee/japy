@@ -152,6 +152,23 @@ class ProfileNotificationTest extends TestBase {
         assertTrue(before.get("data").get("count").asLong() >= 1);
     }
 
+    @Test @Order(53)
+    void 通知类型筛选() throws Exception {
+        // type=comment 只返回评论类通知
+        JsonNode filtered = body(getReq("/api/notifications?page=1&size=20&type=comment", tokenA));
+        assertEquals(200, filtered.get("code").asInt());
+        for (JsonNode n : filtered.get("data").get("list")) {
+            assertEquals("comment", n.get("type").asText(), "type=comment 筛选应只返回评论通知");
+        }
+        // 逗号分隔多类型：comment,reply 均属于"回复我的"
+        JsonNode multi = body(getReq("/api/notifications?page=1&size=20&type=comment,reply", tokenA));
+        assertEquals(200, multi.get("code").asInt());
+        for (JsonNode n : multi.get("data").get("list")) {
+            String t = n.get("type").asText();
+            assertTrue("comment".equals(t) || "reply".equals(t), "多类型筛选应只含 comment/reply，实际=" + t);
+        }
+    }
+
     @Test @Order(52)
     void 单条已读() throws Exception {
         JsonNode list = body(getReq("/api/notifications?page=1&size=20", tokenA)).get("data").get("list");

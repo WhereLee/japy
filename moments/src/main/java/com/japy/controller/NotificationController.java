@@ -12,6 +12,7 @@ import com.japy.mapper.NotificationMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -21,16 +22,24 @@ public class NotificationController {
 
     private final NotificationMapper notificationMapper;
 
-    /** 我的通知列表 */
+    /** 我的通知列表（type 可选：逗号分隔多类型筛选，如 type=like / type=comment,reply） */
     @GetMapping
     public R<PageResult<Notification>> list(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String type) {
         Long userId = UserContext.getUserId();
-        Page<Notification> result = notificationMapper.selectPage(new Page<>(PageParams.page(page), PageParams.size(size)),
-                new LambdaQueryWrapper<Notification>()
-                        .eq(Notification::getUserId, userId)
-                        .orderByDesc(Notification::getCreatedAt));
+        LambdaQueryWrapper<Notification> w = new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getUserId, userId);
+        if (type != null && !type.isBlank()) {
+            List<String> types = java.util.Arrays.stream(type.split(","))
+                    .map(String::trim).filter(s -> !s.isEmpty()).toList();
+            if (!types.isEmpty()) {
+                w.in(Notification::getType, types);
+            }
+        }
+        w.orderByDesc(Notification::getCreatedAt);
+        Page<Notification> result = notificationMapper.selectPage(new Page<>(PageParams.page(page), PageParams.size(size)), w);
         return R.ok(PageResult.of(result.getRecords(), result.getTotal(), page, size));
     }
 
