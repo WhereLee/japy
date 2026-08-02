@@ -158,24 +158,26 @@ onMounted(() => { load(true); refreshUnread() })
 /* 三栏布局（B 站消息中心结构）：160px 导航 + 320px 列表 + 1fr 面板 */
 .notif-wrap {
   display: grid;
-  grid-template-columns: 160px 320px 1fr;
+  grid-template-columns: 160px 240px 1fr;   /* 第一栏160，第二栏240 */
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
   min-height: calc(100vh - 130px);
+  max-width: 1080px;        /* 容器限宽居中，左右留白 */
+  margin: 0 auto;
 }
 
 /* ===== 第一栏：分类导航 ===== */
 .nav-col {
   background: var(--card);
   display: flex; flex-direction: column;
-  padding: 18px 0;
+  padding: 20px 0;
 }
 .nav-title {
   font-size: 16px; font-weight: 700; color: var(--text);
-  padding: 0 16px 14px;
+  padding: 0 18px 16px;
   font-family: var(--serif);
 }
 .nav-list { flex: 1; }
@@ -183,7 +185,7 @@ onMounted(() => { load(true); refreshUnread() })
   display: flex; align-items: center; gap: 10px;
   width: 100%;
   border: none; background: none;
-  padding: 11px 16px;
+  padding: 12px 18px;
   font-size: 13.5px;
   color: var(--text-2);
   cursor: pointer;
