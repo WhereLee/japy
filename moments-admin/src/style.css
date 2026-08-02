@@ -1,0 +1,10 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #app { height: 100%; }
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  background: #f0f2f5;
+  -webkit-font-smoothing: antialiased;
+}
+.page-card { background: #fff; border-radius: 6px; padding: 16px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+.pager { display: flex; justify-content: flex-end; margin-top: 14px; }
