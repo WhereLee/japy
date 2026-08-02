@@ -26,8 +26,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import http from '../api'
 import { timeAgo, toast } from '../utils/format'
+
+const router = useRouter()
 
 const list = ref([])
 const total = ref(0)
@@ -58,11 +61,9 @@ async function open(n) {
       n.isRead = 1
     } catch { /* 忽略 */ }
   }
-  // 跳转：点赞/评论/回复 → 时间线定位动态；公告 → 时间线
+  // 通知类型含动态引用（点赞/评论/回复/被隐藏）：跳回时间线查看
   if (['like', 'comment', 'reply', 'hidden'].includes(n.type) && n.refId) {
-    window.location.hash = ''
-    // 时间线没有按 id 定位接口，跳到动态页顶部并提示
-    toast('已跳转，可查看对应动态')
+    router.push('/')
   }
 }
 

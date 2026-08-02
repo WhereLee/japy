@@ -1,12 +1,5 @@
 <template>
   <div>
-    <!-- 桌面端发动态入口 -->
-    <div v-if="auth.isLogin" class="card quick-publish">
-      <span class="avatar avatar-sm">{{ avatarChar(auth.nickname) }}</span>
-      <button class="quick-input" @click="openPublish()">分享此刻的想法……</button>
-      <button class="btn accent btn-sm" @click="openPublish()">发布</button>
-    </div>
-
     <!-- 时间线 -->
     <div v-if="loading && list.length === 0" class="feed-loading">
       <div v-for="i in 3" :key="i" class="card sk-card">
@@ -37,8 +30,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import http from '../api'
 import { useAuthStore } from '../stores/auth'
-import { avatarChar } from '../utils/format'
-import { openPublish, publishTick } from '../stores/publish'
+import { publishTick } from '../stores/publish'
 import MomentCard from '../components/MomentCard.vue'
 
 const auth = useAuthStore()
@@ -88,7 +80,11 @@ onMounted(() => {
   observer = new IntersectionObserver(entries => {
     if (entries[0].isIntersecting) loadMore()
   }, { rootMargin: '200px' })
-  if (sentinel.value) observer.observe(sentinel.value)
+})
+
+// sentinel 在首屏加载后才渲染，需等它出现再绑定观察
+watch(sentinel, el => {
+  if (el && observer) observer.observe(el)
 })
 
 onUnmounted(() => observer?.disconnect())
@@ -98,23 +94,6 @@ watch(publishTick, () => loadFirst())
 </script>
 
 <style scoped>
-.quick-publish {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-}
-.avatar-sm { width: 36px; height: 36px; font-size: 15px; }
-.quick-input {
-  flex: 1;
-  border: none; background: none;
-  text-align: left;
-  font-size: 14px;
-  color: var(--text-3);
-  cursor: pointer;
-  padding: 8px 0;
-}
-.quick-input:hover { color: var(--text-2); }
-.btn-sm { padding: 6px 18px; }
 .feed-loading .sk-card { margin-bottom: 14px; padding: 16px; }
 .sk-head { display: flex; gap: 12px; align-items: center; }
 .sk-avatar { width: 38px; height: 38px; border-radius: 50%; }

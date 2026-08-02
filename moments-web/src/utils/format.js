@@ -1,8 +1,11 @@
 /** 相对时间：刚刚 / N分钟前 / N小时前 / 昨天 / M月D日 */
 export function timeAgo(t) {
   if (!t) return ''
-  const d = new Date(String(t).includes('T') ? t.replace('T', ' ') + '+08:00' : t)
-  if (isNaN(d.getTime())) return String(t).slice(5, 16).replace('-', '/')
+  // 手动解析（兼容 Safari，避免 new Date("2026-08-03 01:32:06.126") 返回 NaN）
+  const m = String(t).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/)
+  if (!m) return String(t).slice(5, 16).replace('-', '/')
+  const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6])
+  if (isNaN(d.getTime())) return String(t).slice(5, 16)
   const diff = (Date.now() - d.getTime()) / 1000
   if (diff < 60) return '刚刚'
   if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`

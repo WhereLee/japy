@@ -16,6 +16,12 @@
             :maxlength="2000" placeholder="分享此刻的想法……"
             @keydown.meta.enter="submit" @keydown.ctrl.enter="submit"
           ></textarea>
+          <div class="publish-novel">
+            <select v-model="novelId" class="input novel-select">
+              <option :value="null">不关联小说</option>
+              <option v-for="n in novels" :key="n.id" :value="n.id">{{ n.title }}</option>
+            </select>
+          </div>
           <div class="publish-count" :class="{ over: content.length >= 2000 }">
             {{ content.length }} / 2000
           </div>
@@ -40,14 +46,23 @@ import { avatarChar, toast } from '../utils/format'
 
 const auth = useAuthStore()
 const content = ref('')
+const novelId = ref(null)
+const novels = ref([])
 const sending = ref(false)
 const ta = ref(null)
 
 watch(publishOpen, async open => {
   if (open) {
     content.value = ''
+    novelId.value = null
     await nextTick()
     ta.value?.focus()
+    if (novels.value.length === 0) {
+      try {
+        const data = await http.get('/api/novels?page=1&size=50')
+        novels.value = data.list
+      } catch { /* 忽略 */ }
+    }
   }
 })
 
@@ -58,7 +73,9 @@ async function submit() {
   if (!text) return
   sending.value = true
   try {
-    await http.post('/api/moments', { content: text })
+    const body = { content: text }
+    if (novelId.value) body.novelId = novelId.value
+    await http.post('/api/moments', body)
     toast('发布成功')
     close()
     published()
@@ -76,6 +93,8 @@ async function submit() {
 .avatar-sm { width: 34px; height: 34px; font-size: 15px; }
 .publish-name { font-size: 14px; font-weight: 600; }
 .publish-input { min-height: 140px; }
+.publish-novel { margin-top: 10px; }
+.novel-select { max-width: 240px; padding: 7px 10px; font-size: 13px; }
 .publish-count {
   text-align: right; font-size: 12px; color: var(--text-3);
   margin-top: 6px;

@@ -9,7 +9,7 @@
         </router-link>
 
         <nav class="nav">
-          <router-link to="/" class="nav-item" :class="{ active: $route.path === '/' }">动态</router-link>
+          <router-link to="/" class="nav-item" :class="{ active: $route.path === '/' }">首页</router-link>
           <router-link to="/novels" class="nav-item" :class="{ active: $route.path.startsWith('/novels') }">小说</router-link>
         </nav>
 
@@ -23,6 +23,7 @@
               <span class="avatar avatar-sm">{{ avatarChar(auth.nickname) }}</span>
               <span class="me-name">{{ auth.nickname }}</span>
             </router-link>
+            <button class="logout-btn" @click="logout">退出</button>
           </template>
           <router-link v-else to="/login" class="btn primary btn-sm">登录</router-link>
         </div>
@@ -33,24 +34,18 @@
     <main class="main">
       <router-view />
     </main>
-
-    <!-- 移动端浮动发动态按钮 -->
-    <button v-if="auth.isLogin && $route.path === '/'" class="fab" @click="openPublish()">✎</button>
-
-    <!-- 发动态弹层 -->
-    <PublishModal />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import http from '../api'
 import { avatarChar } from '../utils/format'
-import { openPublish } from '../stores/publish'
-import PublishModal from '../components/PublishModal.vue'
 
 const auth = useAuthStore()
+const router = useRouter()
 const unread = ref(0)
 
 let timer = null
@@ -67,6 +62,11 @@ function startPolling() {
 }
 onMounted(() => { startPolling(); window.addEventListener('focus', loadUnread) })
 onUnmounted(() => { clearInterval(timer); window.removeEventListener('focus', loadUnread) })
+
+function logout() {
+  auth.logout()
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -114,24 +114,17 @@ onUnmounted(() => { clearInterval(timer); window.removeEventListener('focus', lo
 .me { display: flex; align-items: center; gap: 8px; }
 .avatar-sm { width: 30px; height: 30px; font-size: 13px; }
 .me-name { font-size: 13px; color: var(--text); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.logout-btn {
+  border: none; background: none;
+  font-size: 12px; color: var(--text-3);
+  cursor: pointer; padding: 4px 8px;
+}
+.logout-btn:hover { color: var(--danger); }
 .btn-sm { padding: 5px 14px; font-size: 13px; }
 .main {
   max-width: 880px; margin: 0 auto;
   padding: 20px 16px 80px;
 }
-.fab {
-  position: fixed; right: 24px; bottom: 40px;
-  width: 52px; height: 52px;
-  border-radius: 50%;
-  border: none;
-  background: var(--ink); color: var(--accent);
-  font-size: 22px;
-  box-shadow: 0 6px 20px rgba(30,26,20,.35);
-  cursor: pointer;
-  z-index: 90;
-  transition: transform .15s;
-}
-.fab:hover { transform: scale(1.06); }
 @media (max-width: 640px) {
   .me-name { display: none; }
 }

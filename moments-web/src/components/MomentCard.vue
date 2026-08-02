@@ -16,18 +16,27 @@
     <!-- 内容 -->
     <div class="m-content" @click="toggleComments">{{ m.content }}</div>
 
-    <!-- 点赞区 -->
-    <div v-if="m.likeCount > 0 || m.liked" class="m-like-row" @click="showLikes">
-      <span class="like-icon" :class="{ liked: m.liked }">♡</span>
-      <span v-if="m.likeCount > 0" class="like-text">
-        <template v-if="likedNames.length">
-          <b>{{ likedNames[0] }}</b><template v-if="m.likeCount > 1">、<b>{{ likedNames[1] }}</b></template>
-          <template v-if="m.likeCount > 2">等</template>
-          {{ m.likeCount > 2 ? `${m.likeCount} 人赞过` : (m.likeCount > 1 ? '赞过' : '赞过') }}
-        </template>
-        <template v-else>{{ m.likeCount }} 人赞过</template>
-      </span>
-    </div>
+    <!-- 关联小说标签 -->
+    <router-link v-if="m.novelTitle" to="/novels" class="m-novel">
+      <span class="novel-icon">📖</span>
+      <span class="novel-name">{{ m.novelTitle }}</span>
+    </router-link>
+
+    <!-- 点赞区（QQ空间式：前5个名字可点击跳个人页，超出显示"等N人"） -->
+    <Transition name="like">
+      <div v-if="m.likeCount > 0 || m.liked" class="m-like-row">
+        <span class="like-heart" :class="{ liked: m.liked }">❤</span>
+        <span v-if="m.likedBy && m.likedBy.length" class="like-text">
+          <template v-for="(l, i) in m.likedBy" :key="l.userId">
+            <router-link v-if="i > 0" :to="`/user/${l.userId}`" class="like-name">、{{ l.nickname }}</router-link>
+            <router-link v-else :to="`/user/${l.userId}`" class="like-name">{{ l.nickname }}</router-link>
+          </template>
+          <template v-if="m.likeCount > 5">等 {{ m.likeCount }} 人</template>
+          觉得很赞
+        </span>
+        <span v-else class="like-text">{{ m.likeCount }} 人觉得很赞</span>
+      </div>
+    </Transition>
 
     <!-- 操作栏 -->
     <footer class="m-actions">
@@ -38,10 +47,6 @@
       <button class="act" @click="toggleComments">
         <span class="act-icon">💬</span>
         <span>评论{{ m.commentCount > 0 ? ` ${fmtNum(m.commentCount)}` : '' }}</span>
-      </button>
-      <button class="act" @click="showLikes">
-        <span class="act-icon">👥</span>
-        <span>赞列表</span>
       </button>
     </footer>
 
@@ -54,25 +59,6 @@
       />
     </div>
   </article>
-
-  <!-- 赞列表弹层 -->
-  <teleport to="body">
-    <div v-if="likesVisible" class="modal-mask" @click.self="likesVisible = false">
-      <div class="modal likes-modal">
-        <div class="modal-head"><h3>赞过的人</h3><button class="modal-close" @click="likesVisible = false">✕</button></div>
-        <div class="modal-body">
-          <div v-if="likes.length === 0" class="empty"><div class="icon">♡</div><p>还没有人赞过</p></div>
-          <div v-for="l in likes" :key="l.id" class="like-item">
-            <router-link :to="`/user/${l.userId}`" class="like-user">
-              <span class="avatar avatar-xs">{{ avatarChar(l.nickname) }}</span>
-              <span>{{ l.nickname }}</span>
-            </router-link>
-            <span class="like-time">{{ timeAgo(l.createdAt) }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </teleport>
 
   <!-- 更多菜单 -->
   <teleport to="body">
@@ -88,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import http from '../api'
 import { useAuthStore } from '../stores/auth'
 import { timeAgo, fullTime, fmtNum, avatarChar, toast } from '../utils/format'
@@ -99,12 +85,8 @@ const emit = defineEmits(['deleted'])
 
 const auth = useAuthStore()
 const commentsOpen = ref(false)
-const likesVisible = ref(false)
-const likes = ref([])
 const menuVisible = ref(false)
 const menuPos = ref({ x: 0, y: 0 })
-
-const likedNames = computed(() => (props.m.likedBy || []).slice(0, 2).map(l => l.nickname))
 
 /* ---------- 点赞（乐观更新） ---------- */
 let likeRollback = null
@@ -118,6 +100,8 @@ async function toggleLike() {
     // 以后端为准，避免并发不一致
     props.m.liked = data.liked
     props.m.likeCount = Math.max(0, props.m.likeCount + (data.liked === was ? (data.liked ? 1 : -1) : 0))
+    // 乐观期间刷新"XX觉得很赞"前5人
+    refreshLikedBy()
   } catch (e) {
     props.m.liked = was
     props.m.likeCount = Math.max(0, props.m.likeCount + (was ? 1 : -1))
@@ -125,13 +109,12 @@ async function toggleLike() {
   }
 }
 
-/* ---------- 赞列表 ---------- */
-async function showLikes() {
+/** 点赞后刷新点赞者（前5个，含 userId 供跳转） */
+async function refreshLikedBy() {
   try {
-    const data = await http.get(`/api/moments/${props.m.id}/likes?page=1&size=50`)
-    likes.value = data.list
-    likesVisible.value = true
-  } catch { /* 动态已删除等 */ }
+    const data = await http.get(`/api/moments/${props.m.id}/likes?page=1&size=5`)
+    props.m.likedBy = data.list.map(l => ({ userId: l.userId, nickname: l.nickname }))
+  } catch { /* 忽略 */ }
 }
 
 /* ---------- 评论展开 ---------- */
@@ -181,7 +164,8 @@ async function report() {
 }
 .m-user { display: flex; align-items: center; gap: 10px; }
 .avatar-sm { width: 38px; height: 38px; font-size: 16px; }
-.m-nick { font-size: 14px; font-weight: 600; color: var(--text); }
+.m-nick { font-size: 14px; font-weight: 600; color: var(--text); transition: color .15s; }
+.m-nick:hover { color: var(--accent); }
 .m-right { display: flex; align-items: center; gap: 8px; }
 .pin-tag {
   font-size: 10px; color: var(--accent);
@@ -204,15 +188,38 @@ async function report() {
   cursor: pointer;
   line-height: 1.8;
 }
+.m-novel {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin: 0 16px 8px;
+  padding: 3px 10px;
+  background: var(--accent-soft);
+  border: 1px solid #ecd9a8;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #8a6d1f;
+  transition: all .15s;
+}
+.m-novel:hover { background: #f5e8c6; color: var(--accent); }
+.novel-icon { font-size: 11px; }
 .m-like-row {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 16px;
+  margin: 0 16px;
+  padding: 6px 10px;
+  background: var(--bg-soft);
+  border-radius: 6px;
   cursor: pointer;
   font-size: 12px; color: var(--text-2);
+  transition: background .15s;
 }
-.like-icon { color: var(--text-3); font-size: 11px; }
-.like-icon.liked { color: var(--danger); }
-.m-like-row:hover .like-text { color: var(--accent); }
+.m-like-row:hover { background: var(--line-soft); }
+.like-heart { color: var(--text-3); font-size: 11px; }
+.like-heart.liked { color: var(--danger); }
+.like-name { color: var(--text-2); transition: color .15s; }
+.like-name:hover { color: var(--accent); }
+/* 点赞区平滑出现/消失 */
+.like-enter-active, .like-leave-active { transition: all .25s ease; overflow: hidden; }
+.like-enter-from, .like-leave-to { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+.like-enter-to, .like-leave-from { opacity: 1; }
 .m-actions {
   display: flex;
   border-top: 1px solid var(--line-soft);

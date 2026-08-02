@@ -2,13 +2,16 @@
   <div>
     <!-- 我的资料卡 -->
     <div class="card me-card">
-      <div class="m-row">
-        <span class="avatar avatar-lg">{{ avatarChar(auth.nickname) }}</span>
-        <div class="m-info">
-          <h2 class="m-nick">{{ auth.nickname }}</h2>
-          <p class="m-bio">{{ profile.bio || '这个人很神秘，什么也没写' }}</p>
-          <p class="m-meta">加入于 {{ fullTime(profile.createdAt) }}</p>
+      <div class="me-card-top">
+        <div class="m-row">
+          <span class="avatar avatar-lg">{{ avatarChar(auth.nickname) }}</span>
+          <div class="m-info">
+            <h2 class="m-nick">{{ auth.nickname }}</h2>
+            <p class="m-bio">{{ profile.bio || '这个人很神秘，什么也没写' }}</p>
+            <p class="m-meta">加入于 {{ fullTime(profile.createdAt) }}</p>
+          </div>
         </div>
+        <button class="btn accent publish-entry" @click="openPublish()">✎ 发布动态</button>
       </div>
 
       <div class="tabs">
@@ -45,14 +48,38 @@
     <div class="pager">
       <button v-if="myTotal > myMoments.length" class="link-btn" @click="moreMoments">加载更多</button>
     </div>
+
+    <!-- 我的评论 -->
+    <h3 class="sec-title">我的评论</h3>
+    <div class="card">
+      <div v-if="myComments.length === 0 && !loading" class="empty" style="padding:28px 0;">
+        <p>还没有发表过评论</p>
+      </div>
+      <div v-for="c in myComments" :key="c.id" class="mc-item">
+        <div class="mc-text">{{ c.content }}</div>
+        <div class="mc-meta">
+          <span>动态 #{{ c.momentId }}</span>
+          <span>· {{ timeAgo(c.createdAt) }}</span>
+          <button class="mc-del" @click="delComment(c)">删除</button>
+        </div>
+      </div>
+    </div>
+    <div class="pager">
+      <button v-if="mcTotal > myComments.length" class="link-btn" @click="moreComments">加载更多</button>
+    </div>
   </div>
+
+  <!-- 发布动态弹层 -->
+  <PublishModal />
 </template>
 
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import http from '../api'
 import { useAuthStore } from '../stores/auth'
-import { avatarChar, fullTime, toast } from '../utils/format'
+import { avatarChar, fullTime, timeAgo, toast } from '../utils/format'
+import { openPublish } from '../stores/publish'
+import PublishModal from '../components/PublishModal.vue'
 import MomentCard from '../components/MomentCard.vue'
 
 const auth = useAuthStore()
@@ -65,6 +92,9 @@ const saving = ref(false)
 const myMoments = ref([])
 const myTotal = ref(0)
 const myPage = ref(1)
+const myComments = ref([])
+const mcTotal = ref(0)
+const mcPage = ref(1)
 const loading = ref(false)
 
 async function load() {
@@ -75,12 +105,37 @@ async function load() {
   form.bio = data.bio || ''
   myMoments.value = data.moments.list || []
   myTotal.value = data.moments.total || 0
+  loadComments()
 }
 async function moreMoments() {
   myPage.value += 1
   const data = await http.get(`/api/users/${auth.userId}?page=${myPage.value}&size=10`)
   myMoments.value = myMoments.value.concat(data.moments.list || [])
   myTotal.value = data.moments.total || 0
+}
+
+async function loadComments(reset = true) {
+  const data = await http.get('/api/users/me/comments', {
+    params: { page: reset ? 1 : mcPage.value, size: 10 }
+  })
+  if (reset) { myComments.value = data.list; mcPage.value = 1 }
+  else myComments.value = myComments.value.concat(data.list)
+  mcTotal.value = data.total
+}
+async function moreComments() {
+  mcPage.value += 1
+  loadComments(false)
+}
+
+async function delComment(c) {
+  if (!confirm('确定删除这条评论吗？')) return
+  try {
+    await http.delete(`/api/comments/${c.id}`)
+    toast('已删除')
+    loadComments(true)
+  } catch (e) {
+    toast(e.response?.data?.msg || '删除失败', 'error')
+  }
 }
 
 async function saveInfo() {
@@ -118,6 +173,11 @@ onMounted(load)
 
 <style scoped>
 .me-card { padding: 22px; margin-bottom: 20px; }
+.me-card-top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px;
+}
+.publish-entry { flex-shrink: 0; }
 .m-row { display: flex; gap: 18px; align-items: center; margin-bottom: 18px; }
 .avatar-lg { width: 64px; height: 64px; font-size: 26px; }
 .m-nick { font-size: 20px; font-family: var(--serif); }
@@ -141,6 +201,19 @@ onMounted(load)
 .f-label { display: block; font-size: 12px; color: var(--text-2); margin: 12px 0 6px; }
 .submit { margin-top: 18px; padding: 8px 32px; }
 .sec-title { font-size: 14px; color: var(--text-2); margin: 4px 2px 12px; }
+.mc-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.mc-item:last-child { border-bottom: none; }
+.mc-text { font-size: 14px; word-break: break-word; }
+.mc-meta { font-size: 12px; color: var(--text-3); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.mc-del {
+  margin-left: 8px;
+  border: none; background: none;
+  color: var(--text-3); font-size: 12px; cursor: pointer;
+}
+.mc-del:hover { color: var(--danger); }
 .pager { text-align: center; padding: 10px 0; }
 .link-btn { border: none; background: none; color: var(--accent); font-size: 13px; cursor: pointer; }
 </style>
