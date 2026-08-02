@@ -15,6 +15,11 @@ public class GlobalExceptionHandler {
         return R.fail("请求体格式错误，请检查JSON格式与编码（需UTF-8）");
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public R<Void> handleMaxUpload(org.springframework.web.multipart.MaxUploadSizeExceededException e) {
+        return R.fail("文件过大，单文件上限 20MB");
+    }
+
     @ExceptionHandler(Exception.class)
     public R<Void> handleException(Exception e) {
         log.error("未处理异常", e);

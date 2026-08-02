@@ -1,6 +1,6 @@
 # japy-moments · 标准 QQ空间/朋友圈式动态社区
 
-一个干净、标准的"动态社区"Java 后端：用户发动态（说说）、点赞（带赞列表）、评论（楼中楼）、个人主页、通知、举报、管理后台。**与小说/RAG 完全解耦**，作为独立子项目存在。
+一个干净、标准的"动态社区"Java 后端：用户发动态（说说）、点赞（带赞列表）、评论（楼中楼）、个人主页、通知、举报、管理后台、**小说入库（txt→章节→段落→统计）**。**与小说/RAG 完全解耦**，作为独立子项目存在。
 
 ## 技术栈
 
@@ -46,6 +46,7 @@ mvn spring-boot:run
 - 举报处理：通过（自动隐藏内容 + 通知举报者）/ 驳回
 - 敏感词管理（内存缓存 60s TTL）
 - 公告广播 / 操作日志
+- **小说管理**：上传 txt → 章节检测（7组正则+验证+降级，移植自 pyser）→ 自然段切分 → 统计 → 落盘目录（`novels/{小说名}/{source|chapters|stats}`）→ 入库（novel / novel_chapter / novel_paragraph）
 
 ## 核心设计
 
@@ -58,9 +59,9 @@ mvn spring-boot:run
 
 ## 数据库表
 
-`app_user` 用户 · `moment` 动态 · `moment_like` 点赞 · `comment` 评论(楼中楼) · `notification` 通知 · `report` 举报 · `sensitive_word` 敏感词 · `operation_log` 操作日志
+`app_user` 用户 · `moment` 动态 · `moment_like` 点赞 · `comment` 评论(楼中楼) · `notification` 通知 · `report` 举报 · `sensitive_word` 敏感词 · `operation_log` 操作日志 · `novel` 小说 · `novel_chapter` 章节(含统计) · `novel_paragraph` 段落(引用原文检索的数据底座)
 
-## 测试（JUnit 集成测试，109 项）
+## 测试（JUnit 集成测试，129 项）
 
 ```bash
 mvn test   # 需要 PostgreSQL japy_moments 库已存在（schema 由应用启动时创建）
@@ -75,6 +76,7 @@ mvn test   # 需要 PostgreSQL japy_moments 库已存在（schema 由应用启�
 | ReportAdminTest | 举报边界/封禁解封/重置密码/强改昵称/举报处理/敏感词即时生效/公告/日志 | 27 |
 | EdgeCaseTest | P0/P1 回归：孤儿数据/计数一致/size上限/通知节流/点赞语义/子回复分页/游标分页 | 11 |
 | ConcurrencyTest | 同一用户并发点赞（唯一约束幂等）、不同用户并发点赞（计数正确） | 2 |
+| NovelUploadTest | 小说上传入库链路：分章/统计/落盘目录/数据库/覆盖重导/权限/公开列表/详情/分章器与段落切分器单测 | 9 |
 
 **测试要点：**
 - 全部通过 MockMvc 走真实 HTTP 层（含拦截器/权限/JWT 全链路）

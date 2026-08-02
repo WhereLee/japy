@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>拼象 · 小说管理</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --line: #e6e8ec;
+    --text: #1f2329;
+    --text-2: #6b7280;
+    --primary: #3b6ef6;
+    --primary-soft: #eef3fe;
+    --success: #16a34a;
+    --success-soft: #ecfdf3;
+    --warn: #d97706;
+    --warn-soft: #fffbeb;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  /* ===== 顶栏 ===== */
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .logo .dot {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(135deg, #3b6ef6, #7c5cf0);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 14px;
+  }
+  .logo .tag {
+    font-size: 12px; font-weight: 400; color: var(--text-2);
+    background: var(--bg); border: 1px solid var(--line);
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .admin { color: var(--text-2); display: flex; align-items: center; gap: 10px; }
+  .admin b { color: var(--text); font-weight: 600; }
+  .admin a { color: var(--primary); cursor: pointer; text-decoration: none; }
+
+  /* ===== 登录面板 ===== */
+  .login-mask {
+    position: fixed; inset: 0; background: rgba(15,23,42,.45);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+  }
+  .login-box {
+    background: #fff; border-radius: 14px; padding: 28px 32px; width: 340px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  }
+  .login-box h3 { font-size: 17px; margin-bottom: 4px; }
+  .login-box .sub { font-size: 12px; color: var(--text-2); margin-bottom: 18px; }
+  .login-box label { display: block; font-size: 12px; color: var(--text-2); margin: 10px 0 4px; }
+  .login-box input {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 14px; outline: none;
+  }
+  .login-box input:focus { border-color: var(--primary); }
+  .login-box .err { color: #dc2626; font-size: 12px; margin-top: 8px; min-height: 16px; }
+
+  /* ===== file:// 打开提示 ===== */
+  .scheme-tip {
+    background: #fef2f2; color: #b91c1c;
+    border-bottom: 1px solid #fecaca;
+    padding: 8px 24px; font-size: 13px; text-align: center;
+  }
+  .scheme-tip b { color: #dc2626; }
+  .login-box button {
+    width: 100%; margin-top: 12px; border: none; border-radius: 8px;
+    background: var(--primary); color: #fff; font-size: 14px; font-weight: 600;
+    padding: 10px 0; cursor: pointer;
+  }
+  .login-box button:hover { background: #2f5ce0; }
+  .login-box button:disabled { background: #b9c6e8; cursor: not-allowed; }
+
+  /* ===== 布局 ===== */
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-size: 15px; font-weight: 600;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .panel h2 .badge {
+    font-size: 11px; font-weight: 400; color: var(--text-2);
+    background: var(--bg); border: 1px solid var(--line);
+    padding: 1px 7px; border-radius: 999px;
+  }
+
+  /* ===== 上传区 ===== */
+  .drop-zone {
+    border: 2px dashed #c9d2e0;
+    border-radius: var(--radius);
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    background: #fafbfc;
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--primary); background: var(--primary-soft); }
+  .drop-zone .icon { font-size: 30px; margin-bottom: 8px; }
+  .drop-zone .hint { color: var(--text-2); }
+  .drop-zone .hint b { color: var(--primary); }
+  .file-info {
+    margin-top: 12px; display: flex; align-items: center; justify-content: space-between;
+    background: var(--primary-soft); border: 1px solid #d6e2fd;
+    border-radius: 8px; padding: 8px 12px; font-size: 13px;
+  }
+  .file-info .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-info .size { color: var(--text-2); flex-shrink: 0; margin-left: 10px; }
+  .file-info .clear { color: var(--text-2); cursor: pointer; margin-left: 8px; flex-shrink: 0; }
+  .file-info .clear:hover { color: #dc2626; }
+
+  .btn {
+    width: 100%; margin-top: 12px;
+    border: none; border-radius: 8px;
+    background: var(--primary); color: #fff;
+    font-size: 14px; font-weight: 600;
+    padding: 10px 0; cursor: pointer;
+    transition: background .15s;
+  }
+  .btn:hover { background: #2f5ce0; }
+  .btn:disabled { background: #b9c6e8; cursor: not-allowed; }
+
+  /* ===== 步骤指示器 ===== */
+  .steps { display: flex; align-items: center; margin-top: 18px; }
+  .step { flex: 1; text-align: center; position: relative; }
+  .step .circle {
+    width: 28px; height: 28px; margin: 0 auto;
+    border-radius: 50%;
+    background: #f0f2f5; color: var(--text-2);
+    border: 2px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600;
+    transition: all .2s;
+    position: relative; z-index: 1;
+  }
+  .step .label { margin-top: 6px; font-size: 12px; color: var(--text-2); }
+  .step.running .circle { border-color: var(--primary); background: var(--primary); color: #fff; }
+  .step.running .label { color: var(--primary); font-weight: 600; }
+  .step.done .circle { border-color: var(--success); background: var(--success); color: #fff; }
+  .step.done .label { color: var(--success); }
+  .step:not(:last-child)::after {
+    content: ""; position: absolute; top: 14px; left: calc(50% + 16px);
+    width: calc(100% - 32px); height: 2px; background: var(--line);
+  }
+  .step.done:not(:last-child)::after { background: var(--success); }
+  .step.running .circle { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(59,110,246,.35); } 50% { box-shadow: 0 0 0 6px rgba(59,110,246,0); } }
+  .spin {
+    width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff; border-radius: 50%;
+    animation: rot .7s linear infinite;
+  }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  /* ===== 统计卡片 ===== */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 14px 16px;
+  }
+  .stat .k { font-size: 12px; color: var(--text-2); }
+  .stat .v { font-size: 24px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat .v small { font-size: 13px; font-weight: 400; color: var(--text-2); margin-left: 2px; }
+  .stat.empty .v { color: #c4c9d4; font-weight: 500; font-size: 20px; }
+
+  /* ===== 表格 ===== */
+  .table-wrap { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; background: #f8f9fb;
+    text-align: left; padding: 9px 12px;
+    font-weight: 600; color: var(--text-2);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  tbody td { padding: 8px 12px; border-bottom: 1px solid #f1f2f5; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafbfd; }
+  td.num { font-variant-numeric: tabular-nums; color: var(--text-2); }
+  td.title-cell { font-weight: 500; }
+  .empty-tip { padding: 36px 0; text-align: center; color: #c4c9d4; }
+  .empty-tip .big { font-size: 26px; margin-bottom: 8px; }
+
+  /* ===== 小说列表 ===== */
+  .novel-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .novel-row .cover {
+    width: 38px; height: 38px; border-radius: 8px;
+    background: linear-gradient(135deg, #3b6ef6, #7c5cf0);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .novel-row .info { flex: 1; min-width: 0; }
+  .novel-row .info .t { font-weight: 600; }
+  .novel-row .info .s { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+  .novel-row .meta { text-align: right; flex-shrink: 0; }
+  .novel-row .meta .n { font-size: 13px; font-variant-numeric: tabular-nums; }
+  .novel-row .meta .d { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+  .tag {
+    display: inline-block; font-size: 12px; padding: 2px 8px;
+    border-radius: 999px; font-weight: 500;
+  }
+  .tag.building { background: var(--warn-soft); color: var(--warn); }
+  .tag.ready { background: var(--success-soft); color: var(--success); }
+  .tag.failed { background: #fef2f2; color: #dc2626; }
+  .fade-in { animation: fadeIn .4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+  footer { text-align: center; color: #b6bcc7; font-size: 12px; padding: 12px 0 32px; }
+
+  @media (max-width: 760px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- 登录面板 -->
+<div class="login-mask" id="loginMask" hidden>
+  <div class="login-box">
+    <h3>管理员登录</h3>
+    <div class="sub">小说上传与入库仅限管理员</div>
+    <form id="loginForm">
+      <label>用户名</label>
+      <input id="loginUser" placeholder="admin" autocomplete="username">
+      <label>密码</label>
+      <input id="loginPass" type="password" placeholder="请输入密码" autocomplete="current-password">
+      <div class="err" id="loginErr"></div>
+      <button type="submit" id="loginBtn">登 录</button>
+    </form>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <span class="dot">拼</span> 拼象
+    <span class="tag">管理端 · 小说管理</span>
+  </div>
+  <div class="admin" id="adminBar" hidden><b>admin</b><span>·</span><a id="logout">退出</a></div>
+</header>
+
+<main>
+  <!-- 上传 + 步骤 -->
+  <div class="panel">
+    <h2>上传小说 <span class="badge" id="uploadBadge">等待上传</span></h2>
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">📄</div>
+      <div class="hint">点击选择或拖拽 <b>txt 文件</b> 到这里</div>
+      <input type="file" id="fileInput" accept=".txt" hidden>
+    </div>
+    <div class="file-info" id="fileInfo" hidden>
+      <span class="name" id="fileName"></span>
+      <span style="display:flex;align-items:center;">
+        <span class="size" id="fileSize"></span>
+        <span class="clear" id="fileClear">✕</span>
+      </span>
+    </div>
+    <button class="btn" id="uploadBtn" disabled>上传并解析</button>
+
+    <div class="steps" id="steps">
+      <div class="step" data-step="0">
+        <div class="circle" id="dot0">1</div>
+        <div class="label">上传文件</div>
+      </div>
+      <div class="step" data-step="1">
+        <div class="circle" id="dot1">2</div>
+        <div class="label">章节识别</div>
+      </div>
+      <div class="step" data-step="2">
+        <div class="circle" id="dot2">3</div>
+        <div class="label">统计生成</div>
+      </div>
+      <div class="step" data-step="3">
+        <div class="circle" id="dot3">4</div>
+        <div class="label">切块入库</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="stats">
+    <div class="stat empty" id="stChapters"><div class="k">章节数</div><div class="v">—</div></div>
+    <div class="stat empty" id="stChars"><div class="k">总字数</div><div class="v">—</div></div>
+    <div class="stat empty" id="stParas"><div class="k">自然段数</div><div class="v">—</div></div>
+    <div class="stat empty" id="stMaxPara"><div class="k">最长自然段</div><div class="v">—</div></div>
+  </div>
+
+  <!-- 章节清单 -->
+  <div class="panel">
+    <h2>章节清单 <span class="badge" id="chapterBadge">0 章</span></h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:56px;">序号</th>
+            <th>章节标题</th>
+            <th style="width:90px;">字数</th>
+            <th style="width:90px;">自然段</th>
+            <th style="width:110px;">最长段落</th>
+          </tr>
+        </thead>
+        <tbody id="chapterBody">
+          <tr><td colspan="5"><div class="empty-tip"><div class="big">📖</div>暂无数据，请上传小说</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 已入库小说 -->
+  <div class="panel">
+    <h2>已入库小说 <span class="badge" id="novelBadge">0 本</span></h2>
+    <div id="novelList">
+      <div class="empty-tip"><div class="big">📚</div>暂无小说，上传第一本吧</div>
+    </div>
+  </div>
+
+  <footer>拼象 · 小说管理端 · 当前状态：<b id="stateTag" style="color:var(--text-2)">未知</b> · <a id="clearState" style="color:var(--primary);cursor:pointer">清除本地登录态</a></footer>
+</main>
+
+<script>
+/* ============================================================
+ * 拼象 · 小说管理端（真实接口版）
+ * 接口：
+ *   POST /auth/login                管理员登录
+ *   POST /api/admin/novels/upload   上传 txt 并入库（multipart: file, author?）
+ *   GET  /api/admin/novels          小说列表（page/size/keyword）
+ *   GET  /api/admin/novels/{id}     小说详情（含章节）
+ * 数据流入：选择文件 → 上传 → 章节识别 → 统计 → 切块入库 → 章节表/统计卡片/列表更新
+ * ============================================================ */
+
+var TOKEN_KEY = "japy_admin_token";
+function token() { return localStorage.getItem(TOKEN_KEY); }
+function api(path, options) {
+  options = options || {};
+  options.headers = Object.assign({}, options.headers || {});
+  if (token()) options.headers["Authorization"] = "Bearer " + token();
+  return fetch(path, options).then(function (resp) {
+    if (resp.status === 401 || resp.status === 403) {
+      logout(true);
+      throw new Error("登录已失效，请重新登录");
+    }
+    return resp.json().then(function (json) {
+      if (json.code !== 200) throw new Error(json.msg || "请求失败");
+      return json.data;
+    });
+  });
+}
+
+var $ = function (id) { return document.getElementById(id); };
+var dropZone = $("dropZone"), fileInput = $("fileInput");
+var fileInfo = $("fileInfo"), fileName = $("fileName"), fileSize = $("fileSize"), fileClear = $("fileClear");
+var uploadBtn = $("uploadBtn");
+var steps = [0, 1, 2, 3].map(function (i) { return $("dot" + i); });
+var selectedFile = null, busy = false;
+
+function fmtSize(b) {
+  return b >= 1024 * 1024 ? (b / 1024 / 1024).toFixed(1) + " MB" : Math.round(b / 1024) + " KB";
+}
+function fmtNum(n) { return (n == null ? 0 : n).toLocaleString("zh-CN"); }
+function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function setStep(i, state) {
+  var el = steps[i].closest(".step");
+  el.classList.remove("running", "done");
+  if (state === "running") {
+    el.classList.add("running");
+    steps[i].innerHTML = '<span class="spin"></span>';
+  } else if (state === "done") {
+    el.classList.add("done");
+    steps[i].textContent = "✓";
+  } else {
+    steps[i].textContent = i + 1;
+  }
+}
+function resetSteps() { for (var i = 0; i < 4; i++) setStep(i, "idle"); }
+function setBadge(text, color) {
+  var b = $("uploadBadge");
+  b.textContent = text;
+  b.style.color = color || "";
+}
+
+function animateNum(el, target) {
+  var start = 0, dur = 600, t0 = performance.now();
+  function tick(t) {
+    var p = Math.min((t - t0) / dur, 1);
+    var v = Math.round(target * (1 - Math.pow(1 - p, 3)));
+    el.textContent = fmtNum(v);
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+function fillStat(id, label, value) {
+  var el = $(id);
+  el.classList.remove("empty");
+  el.innerHTML = '<div class="k">' + label + '</div><div class="v"></div>';
+  animateNum(el.querySelector(".v"), value);
+}
+
+// ---------- 登录 ----------
+function logout(silent) {
+  localStorage.removeItem(TOKEN_KEY);
+  $("adminBar").hidden = true;
+  $("loginMask").hidden = false;
+  if (!silent) { $("loginErr").textContent = "已退出登录"; }
+}
+function showErr(msg) {
+  $("loginErr").textContent = msg;
+  alert("登录失败：" + msg);   // 明确反馈，避免静默失败
+}
+$("loginForm").addEventListener("submit", function (e) {
+  e.preventDefault();   // 表单提交改为 fetch，避免整页刷新
+  var u = $("loginUser").value.trim(), p = $("loginPass").value;
+  var btn = $("loginBtn");
+  btn.disabled = true;
+  $("loginErr").textContent = "";
+  fetch("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: u, password: p })
+  }).then(function (r) { return r.json(); }).then(function (json) {
+    if (json.code !== 200) throw new Error(json.msg);
+    localStorage.setItem(TOKEN_KEY, json.data.token);
+    $("adminBar").hidden = false;
+    $("adminBar").querySelector("b").textContent = json.data.nickname || u;
+    $("loginMask").hidden = true;
+    init();
+  }).catch(function (e) {
+    showErr(e && e.message ? e.message : "网络请求失败，请确认后端已启动（http://localhost:8083）");
+  }).finally(function () { btn.disabled = false; });
+});
+$("loginPass").addEventListener("keydown", function (e) { if (e.key === "Enter") $("loginBtn").click(); });
+$("logout").addEventListener("click", function () { logout(false); });
+
+// ---------- 文件选择 ----------
+function selectFile(file) {
+  if (busy) return;
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith(".txt")) { alert("请选择 txt 文件"); return; }
+  selectedFile = file;
+  fileName.textContent = file.name;
+  fileSize.textContent = fmtSize(file.size);
+  fileInfo.hidden = false;
+  uploadBtn.disabled = false;
+  setBadge("已选择文件", "var(--primary)");
+  resetSteps();
+}
+dropZone.addEventListener("click", function () { if (!busy) fileInput.click(); });
+fileInput.addEventListener("change", function () { selectFile(fileInput.files[0]); });
+fileClear.addEventListener("click", function (e) {
+  e.stopPropagation();
+  selectedFile = null; fileInput.value = "";
+  fileInfo.hidden = true; uploadBtn.disabled = true;
+  setBadge("等待上传");
+  resetSteps();
+});
+["dragenter", "dragover"].forEach(function (ev) {
+  dropZone.addEventListener(ev, function (e) { e.preventDefault(); dropZone.classList.add("dragover"); });
+});
+["dragleave", "drop"].forEach(function (ev) {
+  dropZone.addEventListener(ev, function (e) { e.preventDefault(); dropZone.classList.remove("dragover"); });
+});
+dropZone.addEventListener("drop", function (e) { selectFile(e.dataTransfer.files[0]); });
+
+// ---------- 上传入库（真实接口） ----------
+uploadBtn.addEventListener("click", processNovel);
+
+async function processNovel() {
+  if (!selectedFile || busy) return;
+  busy = true;
+  uploadBtn.disabled = true;
+  resetSteps();
+
+  try {
+    // 步骤1：上传文件
+    setStep(0, "running");
+    setBadge("上传中…", "var(--warn)");
+    await delay(300);   // 视觉节奏
+
+    var form = new FormData();
+    form.append("file", selectedFile);
+    var data = await api("/api/admin/novels/upload", { method: "POST", body: form });
+
+    // 后端同步处理：章节识别 → 统计 → 切块入库 在一次请求内完成，
+    // 前端在等待期间推进步骤 1~3（视觉节奏），响应到达后完成。
+    setStep(0, "done");
+    setStep(1, "running");
+    setBadge("章节识别中…", "var(--warn)");
+    await delay(200);
+    setStep(1, "done");
+    setStep(2, "running");
+    setBadge("写入数据库…", "var(--warn)");
+    await delay(200);
+    setStep(2, "done");
+    setStep(3, "done");
+
+    setBadge("入库完成 ✓", "var(--success)");
+    renderResult(data);
+    loadNovels();
+  } catch (e) {
+    setBadge("入库失败", "#dc2626");
+    resetSteps();
+    alert(e.message);
+  } finally {
+    busy = false;
+    uploadBtn.disabled = !selectedFile;
+  }
+}
+
+// ---------- 渲染 ----------
+function renderResult(data) {
+  // 统计卡片
+  fillStat("stChapters", "章节数", data.chapterCount);
+  fillStat("stChars", "总字数", data.totalChars);
+  fillStat("stParas", "自然段数", data.paragraphCount);
+  fillStat("stMaxPara", "最长自然段", data.maxParaChars);
+
+  // 章节表
+  var body = $("chapterBody");
+  body.innerHTML = "";
+  (data.chapters || []).forEach(function (c) {
+    var tr = document.createElement("tr");
+    tr.className = "fade-in";
+    tr.innerHTML =
+      '<td class="num">' + c.no + "</td>" +
+      '<td class="title-cell">' + c.title + "</td>" +
+      '<td class="num">' + fmtNum(c.chars) + "</td>" +
+      '<td class="num">' + fmtNum(c.paragraphCount) + "</td>" +
+      '<td class="num">' + fmtNum(c.maxParaChars) + "</td>";
+    body.appendChild(tr);
+  });
+  $("chapterBadge").textContent = (data.chapters || []).length + " 章";
+}
+
+var coverChar = ["龙", "天", "斗"];
+function renderNovelRow(novel) {
+  var box = $("novelList");
+  var row = document.createElement("div");
+  row.className = "novel-row fade-in";
+  var tag = novel.status === 1
+    ? '<span class="tag ready">已入库</span>'
+    : novel.status === 2 ? '<span class="tag failed">入库失败</span>'
+    : '<span class="tag building">建设中</span>';
+  var cover = coverChar[(novel.id || 0) % coverChar.length];
+  row.innerHTML =
+    '<div class="cover">' + cover + "</div>" +
+    '<div class="info"><div class="t">' + (novel.title || "") + '</div>' +
+    '<div class="s">' + (novel.author || "佚名") + "</div></div>" +
+    '<div class="meta"><div class="n">' + fmtNum(novel.chapterCount) + " 章 · " + fmtNum(novel.totalChars) + " 字</div>" +
+    '<div class="d">' + tag + "</div></div>";
+  box.appendChild(row);
+}
+
+function loadNovels() {
+  api("/api/admin/novels?page=1&size=50").then(function (data) {
+    var box = $("novelList");
+    box.innerHTML = "";
+    if (!data.list || data.list.length === 0) {
+      box.innerHTML = '<div class="empty-tip"><div class="big">📚</div>暂无小说，上传第一本吧</div>';
+      $("novelBadge").textContent = "0 本";
+      return;
+    }
+    data.list.forEach(renderNovelRow);
+    $("novelBadge").textContent = data.list.length + " 本";
+  }).catch(function (e) {
+    console.error("加载小说列表失败:", e.message);
+  });
+}
+
+// ---------- 初始化 ----------
+function init() {
+  // 防护：file:// 协议下 fetch 必然失败，提示用户走 http 访问
+  if (location.protocol === "file:") {
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div class="scheme-tip">⚠ 当前是通过 <b>双击文件</b> 打开的（file:// 协议），接口无法请求。<br>请改为访问 <b>http://localhost:8083/admin.html</b></div>');
+  }
+  var state = $("stateTag");
+  if (token()) {
+    $("adminBar").hidden = false;
+    $("loginMask").hidden = true;
+    state.textContent = "已登录（localStorage 有 token）";
+    state.style.color = "var(--success)";
+    loadNovels();
+  } else {
+    $("loginMask").hidden = false;
+    state.textContent = "未登录";
+    state.style.color = "var(--warn)";
+  }
+}
+$("clearState").addEventListener("click", function () {
+  localStorage.removeItem(TOKEN_KEY);
+  alert("已清除本地登录态，页面将刷新");
+  location.reload();
+});
+init();
+</script>
+</body>
+</html>

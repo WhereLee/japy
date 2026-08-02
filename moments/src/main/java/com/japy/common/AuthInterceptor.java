@@ -23,10 +23,11 @@ public class AuthInterceptor implements HandlerInterceptor {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
 
         String path = request.getRequestURI();
-        // 公开路径：认证接口 + GET浏览（时间线/评论/个人主页）
+        // 公开路径：认证接口 + GET浏览（时间线/评论/个人主页/小说列表）
         if (path.startsWith("/auth/")
                 || (path.startsWith("/api/moments") && "GET".equalsIgnoreCase(request.getMethod()))
                 || (path.startsWith("/api/comments") && "GET".equalsIgnoreCase(request.getMethod()))
+                || (path.startsWith("/api/novels") && "GET".equalsIgnoreCase(request.getMethod()))
                 || (path.matches("/api/users/\\d+") && "GET".equalsIgnoreCase(request.getMethod()))) {
             // 尝试解析token（可选），有就设置上下文
             trySetUser(request);

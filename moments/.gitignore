@@ -18,5 +18,8 @@ Thumbs.db
 logs/
 *.log
 
+# ===== 小说上传产物 =====
+novels/
+
 # ===== 工具元数据 =====
 .reasonix/

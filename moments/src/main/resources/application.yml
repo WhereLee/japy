@@ -1,5 +1,12 @@
 server:
   port: 8083
+  tomcat:
+    accesslog:
+      enabled: true
+      directory: ${user.dir}/logs
+      prefix: access
+      suffix: .log
+      pattern: '%t %m %U %s %Dms'
 
 spring:
   datasource:
@@ -12,6 +19,14 @@ spring:
       mode: always
       schema-locations: classpath:schema.sql
       encoding: UTF-8
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+# 小说上传产物根目录（相对启动目录；目录结构：{novels-dir}/{小说名}/{source|chapters|stats}）
+app:
+  novels-dir: novels
 
 mybatis-plus:
   configuration:
