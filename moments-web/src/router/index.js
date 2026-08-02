@@ -9,7 +9,7 @@ const routes = [
     children: [
       { path: '', name: 'Feed', component: () => import('../views/Feed.vue'), meta: { title: '动态' } },
       { path: 'novels', name: 'Novels', component: () => import('../views/Novels.vue'), meta: { title: '小说' } },
-      { path: 'notifications', name: 'Notifications', component: () => import('../views/Notifications.vue'), meta: { title: '通知', auth: true } },
+      { path: 'notifications', name: 'Notifications', component: () => import('../views/Notifications.vue'), meta: { title: '通知', auth: true, fullWidth: true } },
       { path: 'user/:id', name: 'UserProfile', component: () => import('../views/UserProfile.vue'), meta: { title: '个人主页' } },
       { path: 'me', name: 'Me', component: () => import('../views/Me.vue'), meta: { title: '我的', auth: true } }
     ]

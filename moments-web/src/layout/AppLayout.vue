@@ -31,7 +31,7 @@
     </header>
 
     <!-- 内容 -->
-    <main class="main">
+    <main class="main" :class="{ 'main-full': $route.meta.fullWidth }">
       <router-view />
     </main>
   </div>
@@ -43,25 +43,18 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import http from '../api'
 import { avatarChar } from '../utils/format'
+import { unread, refreshUnread } from '../stores/notify'
 
 const auth = useAuthStore()
 const router = useRouter()
-const unread = ref(0)
 
 let timer = null
-async function loadUnread() {
-  if (!auth.isLogin) return
-  try {
-    const data = await http.get('/api/notifications/unread-count')
-    unread.value = data.count
-  } catch { /* 静默 */ }
-}
 function startPolling() {
-  loadUnread()
-  timer = setInterval(loadUnread, 30000)
+  refreshUnread()
+  timer = setInterval(refreshUnread, 30000)
 }
-onMounted(() => { startPolling(); window.addEventListener('focus', loadUnread) })
-onUnmounted(() => { clearInterval(timer); window.removeEventListener('focus', loadUnread) })
+onMounted(() => { startPolling(); window.addEventListener('focus', refreshUnread) })
+onUnmounted(() => { clearInterval(timer); window.removeEventListener('focus', refreshUnread) })
 
 function logout() {
   auth.logout()
@@ -124,6 +117,10 @@ function logout() {
 .main {
   max-width: 880px; margin: 0 auto;
   padding: 20px 16px 80px;
+}
+.main-full {
+  max-width: none;
+  padding: 16px 24px 40px;
 }
 @media (max-width: 640px) {
   .me-name { display: none; }
