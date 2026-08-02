@@ -28,16 +28,6 @@ public class AdminController {
     private final SensitiveWordService sensitiveWordService;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    private void log(String action, String targetType, Long targetId, String detail) {
-        OperationLog l = new OperationLog();
-        l.setAdminId(UserContext.getUserId());
-        l.setAction(action);
-        l.setTargetType(targetType);
-        l.setTargetId(targetId);
-        l.setDetail(detail);
-        logMapper.insert(l);
-    }
-
     // ===== Dashboard =====
 
     @GetMapping("/dashboard")
@@ -68,6 +58,7 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}/ban")
+    @AdminLog(action = "ban_user")
     public R<Void> banUser(@PathVariable Long id, @RequestBody Map<String, String> body) {
         if (id.equals(UserContext.getUserId())) return R.fail("不能封禁自己");
         User user = userMapper.selectById(id);
@@ -75,37 +66,36 @@ public class AdminController {
         if (user.getStatus() != null && user.getStatus() == 1) return R.fail("用户已被封禁");
         userMapper.update(null, new LambdaUpdateWrapper<User>().eq(User::getId, id).set(User::getStatus, 1));
         notificationService.send(id, "banned", null, null, "你的账号已被封禁，原因：" + body.getOrDefault("reason", "违规"));
-        log("ban_user", "user", id, body.get("reason"));
         return R.ok();
     }
 
     @PutMapping("/users/{id}/unban")
+    @AdminLog(action = "unban_user")
     public R<Void> unbanUser(@PathVariable Long id) {
         User user = userMapper.selectById(id);
         if (user == null) return R.fail("用户不存在");
         userMapper.update(null, new LambdaUpdateWrapper<User>().eq(User::getId, id).set(User::getStatus, 0));
-        log("unban_user", "user", id, null);
         return R.ok();
     }
 
     @PutMapping("/users/{id}/reset-password")
+    @AdminLog(action = "reset_password")
     public R<Void> resetPassword(@PathVariable Long id) {
         User user = userMapper.selectById(id);
         if (user == null) return R.fail("用户不存在");
         userMapper.update(null, new LambdaUpdateWrapper<User>().eq(User::getId, id)
                 .set(User::getPassword, encoder.encode("123456")));
-        log("reset_password", "user", id, "重置为默认密码");
         return R.ok();
     }
 
     @PutMapping("/users/{id}/nickname")
+    @AdminLog(action = "force_nickname")
     public R<Void> forceNickname(@PathVariable Long id, @RequestBody Map<String, String> body) {
         String nick = body.get("nickname");
         if (nick == null || nick.isBlank()) return R.fail("昵称不能为空");
         User user = userMapper.selectById(id);
         if (user == null) return R.fail("用户不存在");
         userMapper.update(null, new LambdaUpdateWrapper<User>().eq(User::getId, id).set(User::getNickname, nick));
-        log("force_nickname", "user", id, "强制改为: " + nick);
         return R.ok();
     }
 
@@ -124,6 +114,7 @@ public class AdminController {
     }
 
     @PutMapping("/moments/{id}/hide")
+    @AdminLog(action = "hide_moment")
     public R<Void> hideMoment(@PathVariable Long id) {
         Moment m = momentMapper.selectById(id);
         if (m == null) return R.fail("动态不存在");
@@ -131,46 +122,45 @@ public class AdminController {
         if (m.getStatus() == 2) return R.fail("动态已被删除，无法隐藏");
         momentMapper.update(null, new LambdaUpdateWrapper<Moment>().eq(Moment::getId, id).set(Moment::getStatus, 1));
         notificationService.send(m.getUserId(), "hidden", "moment", id, "你的动态已被管理员隐藏");
-        log("hide_moment", "moment", id, null);
         return R.ok();
     }
 
     @PutMapping("/moments/{id}/restore")
+    @AdminLog(action = "restore_moment")
     public R<Void> restoreMoment(@PathVariable Long id) {
         Moment m = momentMapper.selectById(id);
         if (m == null) return R.fail("动态不存在");
         if (m.getStatus() == 0) return R.fail("动态状态正常，无需恢复");
         momentMapper.update(null, new LambdaUpdateWrapper<Moment>().eq(Moment::getId, id).set(Moment::getStatus, 0));
-        log("restore_moment", "moment", id, null);
         return R.ok();
     }
 
     @DeleteMapping("/moments/{id}")
+    @AdminLog(action = "delete_moment")
     public R<Void> deleteMoment(@PathVariable Long id) {
         Moment m = momentMapper.selectById(id);
         if (m == null) return R.fail("动态不存在");
         if (m.getStatus() == 2) return R.fail("动态已被删除");
         momentMapper.update(null, new LambdaUpdateWrapper<Moment>().eq(Moment::getId, id).set(Moment::getStatus, 2));
-        log("delete_moment", "moment", id, null);
         return R.ok();
     }
 
     @PutMapping("/moments/{id}/pin")
+    @AdminLog(action = "pin_moment")
     public R<Void> pinMoment(@PathVariable Long id) {
         Moment m = momentMapper.selectById(id);
         if (m == null) return R.fail("动态不存在");
         if (m.getStatus() != 0) return R.fail("只能置顶正常状态的动态");
         momentMapper.update(null, new LambdaUpdateWrapper<Moment>().eq(Moment::getId, id).set(Moment::getPinned, 1));
-        log("pin_moment", "moment", id, null);
         return R.ok();
     }
 
     @PutMapping("/moments/{id}/unpin")
+    @AdminLog(action = "unpin_moment")
     public R<Void> unpinMoment(@PathVariable Long id) {
         Moment m = momentMapper.selectById(id);
         if (m == null) return R.fail("动态不存在");
         momentMapper.update(null, new LambdaUpdateWrapper<Moment>().eq(Moment::getId, id).set(Moment::getPinned, 0));
-        log("unpin_moment", "moment", id, null);
         return R.ok();
     }
 
@@ -186,6 +176,7 @@ public class AdminController {
     }
 
     @PutMapping("/comments/{id}/hide")
+    @AdminLog(action = "hide_comment")
     public R<Void> hideComment(@PathVariable Long id) {
         Comment c = commentMapper.selectById(id);
         if (c == null) return R.fail("评论不存在");
@@ -196,11 +187,11 @@ public class AdminController {
         momentMapper.update(null, new LambdaUpdateWrapper<Moment>()
                 .eq(Moment::getId, c.getMomentId())
                 .setSql("comment_count = GREATEST(0, comment_count - 1)"));
-        log("hide_comment", "comment", id, null);
         return R.ok();
     }
 
     @PutMapping("/comments/{id}/restore")
+    @AdminLog(action = "restore_comment")
     public R<Void> restoreComment(@PathVariable Long id) {
         Comment c = commentMapper.selectById(id);
         if (c == null) return R.fail("评论不存在");
@@ -210,11 +201,11 @@ public class AdminController {
         momentMapper.update(null, new LambdaUpdateWrapper<Moment>()
                 .eq(Moment::getId, c.getMomentId())
                 .setSql("comment_count = comment_count + 1"));
-        log("restore_comment", "comment", id, null);
         return R.ok();
     }
 
     @DeleteMapping("/comments/{id}")
+    @AdminLog(action = "delete_comment")
     public R<Void> deleteComment(@PathVariable Long id) {
         Comment c = commentMapper.selectById(id);
         if (c == null) return R.fail("评论不存在");
@@ -227,7 +218,6 @@ public class AdminController {
                     .eq(Moment::getId, c.getMomentId())
                     .setSql("comment_count = GREATEST(0, comment_count - 1)"));
         }
-        log("delete_comment", "comment", id, null);
         return R.ok();
     }
 
@@ -244,6 +234,7 @@ public class AdminController {
     }
 
     @PutMapping("/reports/{id}/resolve")
+    @AdminLog(action = "resolve_report")
     public R<Void> resolveReport(@PathVariable Long id, @RequestBody Map<String, String> body) {
         Report report = reportMapper.selectById(id);
         if (report == null) return R.fail("举报不存在");
@@ -267,11 +258,11 @@ public class AdminController {
         }
         notificationService.send(report.getReporterId(), "report_result", report.getTargetType(),
                 report.getTargetId(), "你的举报已处理：" + report.getResult());
-        log("resolve_report", "report", id, report.getResult());
         return R.ok();
     }
 
     @PutMapping("/reports/{id}/reject")
+    @AdminLog(action = "reject_report")
     public R<Void> rejectReport(@PathVariable Long id) {
         Report report = reportMapper.selectById(id);
         if (report == null) return R.fail("举报不存在");
@@ -281,7 +272,6 @@ public class AdminController {
         reportMapper.updateById(report);
         notificationService.send(report.getReporterId(), "report_result", report.getTargetType(),
                 report.getTargetId(), "你的举报已驳回");
-        log("reject_report", "report", id, null);
         return R.ok();
     }
 
@@ -293,6 +283,7 @@ public class AdminController {
     }
 
     @PostMapping("/sensitive-words")
+    @AdminLog(action = "add_word")
     public R<Void> addWord(@RequestBody Map<String, String> body) {
         String word = body.get("word");
         if (word == null || word.isBlank()) return R.fail("敏感词不能为空");
@@ -302,21 +293,21 @@ public class AdminController {
         w.setWord(word.trim());
         wordMapper.insert(w);
         sensitiveWordService.invalidateCache();
-        log("add_word", "sensitive_word", null, word);
         return R.ok();
     }
 
     @DeleteMapping("/sensitive-words/{id}")
+    @AdminLog(action = "delete_word")
     public R<Void> deleteWord(@PathVariable Long id) {
         wordMapper.deleteById(id);
         sensitiveWordService.invalidateCache();
-        log("delete_word", "sensitive_word", id, null);
         return R.ok();
     }
 
     // ===== 公告 =====
 
     @PostMapping("/announcements")
+    @AdminLog(action = "announcement")
     public R<Void> announce(@RequestBody Map<String, String> body) {
         String content = body.get("content");
         if (content == null || content.isBlank()) return R.fail("公告内容不能为空");
@@ -324,7 +315,6 @@ public class AdminController {
         for (User u : users) {
             notificationService.send(u.getId(), "announcement", null, null, content);
         }
-        log("announcement", null, null, content);
         return R.ok();
     }
 
