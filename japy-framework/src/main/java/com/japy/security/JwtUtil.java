@@ -41,6 +41,7 @@ public class JwtUtil {
     private String createToken(Long userId, String username, long expireSec, String type) {
         Date now = new Date();
         return Jwts.builder()
+                .id(java.util.UUID.randomUUID().toString())   // jti：每次唯一，同毫秒也不重复（防重放）
                 .subject(String.valueOf(userId))
                 .claim("username", username)
                 .claim("type", type)

@@ -31,6 +31,9 @@ public class OperLogAspect {
     private final SysOperLogMapper operLogMapper;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.beans.factory.annotation.Value("${rocketmq.topics.oper-log:japy_oper_log}")
+    private String operLogTopic;
+
     @Around("@annotation(operLog)")
     public Object around(ProceedingJoinPoint pjp, OperLog operLog) throws Throwable {
         long start = System.currentTimeMillis();
@@ -48,7 +51,7 @@ public class OperLogAspect {
         } finally {
             try {
                 SysOperLog entry = build(pjp, operLog, System.currentTimeMillis() - start, error);
-                if (!mqService.send("japy_oper_log", "oper", objectMapper.writeValueAsString(entry))) {
+                if (!mqService.send(operLogTopic, "oper", objectMapper.writeValueAsString(entry))) {
                     // 降级：同步落库
                     operLogMapper.insert(entry);
                 }
@@ -91,6 +94,7 @@ public class OperLogAspect {
                     sb.append("[file:").append(f.getOriginalFilename()).append("], ");
                 } else {
                     String json = objectMapper.writeValueAsString(arg);
+                    json = maskSensitive(json);
                     sb.append(json.length() > 200 ? json.substring(0, 200) + "…" : json).append(", ");
                 }
             } catch (Exception ignored) {
@@ -99,6 +103,11 @@ public class OperLogAspect {
         }
         String s = sb.toString();
         return s.isEmpty() ? "(无参数)" : s.substring(0, s.length() - 2);
+    }
+
+    /** 敏感字段脱敏：审计日志不落密码类明文（password/oldPassword/newPassword） */
+    private String maskSensitive(String json) {
+        return json.replaceAll("(\"(?:password|oldPassword|newPassword)\"\\s*:\\s*)\"[^\"]*\"", "$1\"******\"");
     }
 
     private String clientIp(HttpServletRequest request) {

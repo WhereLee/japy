@@ -82,12 +82,13 @@ public class AuthService {
         return buildToken(user, request);
     }
 
-    /** 登录：防爆破（Redis 失败计数）→ 校验密码 → 会话 → 登录日志 */
+    /** 登录：防爆破（账号+IP 维度失败计数）→ 校验密码 → 会话 → 登录日志 */
     public TokenVO login(LoginDTO dto, HttpServletRequest request) {
-        // 防爆破：连续失败锁定
-        long failCount = sessionService.incrFailCount(dto.getUsername(), Duration.ofMinutes(lockMinutes));
+        String ip = clientIp(request);
+        // 防爆破：连续失败锁定（账号+IP 复合，避免攻击者锁定他人账号）
+        long failCount = sessionService.incrFailCount(dto.getUsername(), ip, Duration.ofMinutes(lockMinutes));
         if (failCount > maxFail) {
-            throw new BusinessException("登录失败次数过多，账号已锁定 " + lockMinutes + " 分钟");
+            throw new BusinessException("登录失败次数过多，该账号在此网络环境已锁定 " + lockMinutes + " 分钟");
         }
 
         try {
@@ -96,7 +97,7 @@ public class AuthService {
                 saveLoginLog(dto.getUsername(), request, 1, "密码错误");
                 throw new BusinessException("密码错误，还可尝试 " + (maxFail - failCount) + " 次");
             }
-            sessionService.clearFailCount(dto.getUsername());
+            sessionService.clearFailCount(dto.getUsername(), ip);
             saveLoginLog(dto.getUsername(), request, 0, "登录成功");
             return buildToken(loginUser.getUser(), request);
         } catch (org.springframework.security.core.userdetails.UsernameNotFoundException e) {
@@ -108,7 +109,7 @@ public class AuthService {
         }
     }
 
-    /** 刷新 access token（refresh token 需与 Redis 会话一致） */
+    /** 刷新 access token：refresh token 轮换（每次刷新生成新 refresh，旧 refresh 立即失效，防重放） */
     public TokenVO refresh(String refreshToken, HttpServletRequest request) {
         Claims claims = jwtUtil.parse(refreshToken);
         if (claims == null || !"refresh".equals(claims.get("type"))) {
@@ -122,6 +123,7 @@ public class AuthService {
         if (user == null || user.getStatus() != 0) {
             throw new BusinessException("账号不可用");
         }
+        // 轮换：旧 refresh 被覆盖，重放旧 token 将校验失败
         return buildToken(user, request);
     }
 

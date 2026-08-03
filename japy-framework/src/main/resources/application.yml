@@ -52,5 +52,5 @@ springdoc:
     path: /doc.html
 
 logging:
-  level:
-    com.japy: debug
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level [%X{traceId}] %logger{36} - %msg%n"

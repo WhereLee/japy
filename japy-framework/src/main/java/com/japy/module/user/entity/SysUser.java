@@ -17,9 +17,14 @@ public class SysUser {
     private String phone;
     private Integer sex;
     private Integer status;          // 0正常 1停用
-    private Integer delFlag;
+    @TableLogic
+    private Integer delFlag;         // 逻辑删除 0存在 1删除
+    @TableField(fill = FieldFill.INSERT)
     private Long createBy;
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private Long updateBy;
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 }

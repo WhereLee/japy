@@ -24,6 +24,9 @@ public interface SysUserRoleMapper {
     @Select("SELECT role_id FROM sys_user_role WHERE user_id = #{userId}")
     List<Long> selectRoleIds(@Param("userId") Long userId);
 
+    @Select("SELECT user_id FROM sys_user_role WHERE role_id = #{roleId}")
+    List<Long> selectUserIdsByRole(@Param("roleId") Long roleId);
+
     @Select("SELECT perm_id FROM sys_role_permission WHERE role_id = #{roleId}")
     List<Long> selectPermIds(@Param("roleId") Long roleId);
 

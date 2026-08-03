@@ -6,8 +6,10 @@ import com.japy.aspect.OperLog;
 import com.japy.common.BusinessException;
 import com.japy.common.PageResult;
 import com.japy.common.R;
+import com.japy.module.system.dto.AdminDtos;
 import com.japy.module.system.entity.SysNotice;
 import com.japy.module.system.mapper.SysNoticeMapper;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -34,10 +36,11 @@ public class SystemNoticeController {
     @PostMapping
     @PreAuthorize("hasAuthority('system:notice:add')")
     @OperLog(title = "公告管理", businessType = 1)
-    public R<Void> add(@RequestBody SysNotice notice) {
-        if (notice.getNoticeTitle() == null || notice.getNoticeTitle().isBlank()) {
-            throw new BusinessException("公告标题不能为空");
-        }
+    public R<Void> add(@Valid @RequestBody AdminDtos.NoticeDTO dto) {
+        SysNotice notice = new SysNotice();
+        notice.setNoticeTitle(dto.getNoticeTitle());
+        notice.setNoticeType(dto.getNoticeType());
+        notice.setNoticeContent(dto.getNoticeContent());
         notice.setStatus(0);
         noticeMapper.insert(notice);
         return R.ok();
@@ -46,7 +49,13 @@ public class SystemNoticeController {
     @PutMapping
     @PreAuthorize("hasAuthority('system:notice:edit')")
     @OperLog(title = "公告管理", businessType = 2)
-    public R<Void> edit(@RequestBody SysNotice notice) {
+    public R<Void> edit(@Valid @RequestBody AdminDtos.NoticeDTO dto) {
+        SysNotice notice = new SysNotice();
+        notice.setId(dto.getId());
+        notice.setNoticeTitle(dto.getNoticeTitle());
+        notice.setNoticeType(dto.getNoticeType());
+        notice.setNoticeContent(dto.getNoticeContent());
+        notice.setStatus(dto.getStatus());
         noticeMapper.updateById(notice);
         return R.ok();
     }

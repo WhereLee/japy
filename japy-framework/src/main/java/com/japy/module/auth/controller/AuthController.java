@@ -1,6 +1,7 @@
 package com.japy.module.auth.controller;
 
 import com.japy.common.R;
+import com.japy.aspect.RateLimit;
 import com.japy.module.auth.dto.LoginDTO;
 import com.japy.module.auth.dto.RegisterDTO;
 import com.japy.module.auth.service.AuthService;
@@ -26,11 +27,13 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
+    @RateLimit(permitsPerSecond = 3, key = "register")
     public R<TokenVO> register(@Valid @RequestBody RegisterDTO dto, HttpServletRequest request) {
         return R.ok(authService.register(dto, request));
     }
 
     @PostMapping("/login")
+    @RateLimit(permitsPerSecond = 3, key = "login")
     public R<TokenVO> login(@Valid @RequestBody LoginDTO dto, HttpServletRequest request) {
         return R.ok(authService.login(dto, request));
     }

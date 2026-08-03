@@ -2,10 +2,13 @@ package com.japy.module.system.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.japy.aspect.Idempotent;
 import com.japy.aspect.OperLog;
 import com.japy.common.BusinessException;
 import com.japy.common.PageResult;
 import com.japy.common.R;
+import com.japy.module.system.dto.AdminDtos;
+import com.japy.module.system.dto.UserDtos;
 import com.japy.module.user.entity.SysPermission;
 import com.japy.module.user.entity.SysRole;
 import com.japy.module.user.entity.SysUser;
@@ -13,6 +16,8 @@ import com.japy.module.user.mapper.SysPermissionMapper;
 import com.japy.module.user.mapper.SysRoleMapper;
 import com.japy.module.user.mapper.SysUserMapper;
 import com.japy.module.user.mapper.SysUserRoleMapper;
+import com.japy.security.RedisSessionService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +40,7 @@ public class SystemUserController {
     private final SysPermissionMapper permMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
+    private final RedisSessionService sessionService;
 
     // ==================== 用户管理 ====================
 
@@ -57,13 +63,19 @@ public class SystemUserController {
     @PostMapping("/user")
     @PreAuthorize("hasAuthority('system:user:add')")
     @OperLog(title = "用户管理", businessType = 1)
-    public R<Void> addUser(@RequestBody SysUser user) {
-        if (user.getUsername() == null || user.getPassword() == null) throw new BusinessException("参数不完整");
+    @Idempotent
+    public R<Void> addUser(@Valid @RequestBody UserDtos.AddDTO dto) {
         Long exists = userMapper.selectCount(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getUsername, user.getUsername()).eq(SysUser::getDelFlag, 0));
+                .eq(SysUser::getUsername, dto.getUsername()).eq(SysUser::getDelFlag, 0));
         if (exists > 0) throw new BusinessException("用户名已存在");
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setStatus(user.getStatus() == null ? 0 : user.getStatus());
+        SysUser user = new SysUser();
+        user.setUsername(dto.getUsername());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setNickname(dto.getNickname());
+        user.setEmail(dto.getEmail());
+        user.setPhone(dto.getPhone());
+        user.setSex(dto.getSex());
+        user.setStatus(0);
         user.setDelFlag(0);
         userMapper.insert(user);
         return R.ok();
@@ -72,13 +84,13 @@ public class SystemUserController {
     @PutMapping("/user")
     @PreAuthorize("hasAuthority('system:user:edit')")
     @OperLog(title = "用户管理", businessType = 2)
-    public R<Void> editUser(@RequestBody SysUser user) {
-        SysUser db = userMapper.selectById(user.getId());
+    public R<Void> editUser(@Valid @RequestBody UserDtos.EditDTO dto) {
+        SysUser db = userMapper.selectById(dto.getId());
         if (db == null) throw new BusinessException("用户不存在");
-        db.setNickname(user.getNickname());
-        db.setEmail(user.getEmail());
-        db.setPhone(user.getPhone());
-        db.setSex(user.getSex());
+        db.setNickname(dto.getNickname());
+        db.setEmail(dto.getEmail());
+        db.setPhone(dto.getPhone());
+        db.setSex(dto.getSex());
         userMapper.updateById(db);
         return R.ok();
     }
@@ -126,12 +138,14 @@ public class SystemUserController {
     @PreAuthorize("hasAuthority('system:user:assignRole')")
     @OperLog(title = "用户管理", businessType = 2)
     @Transactional
-    public R<Void> assignRoles(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
+    public R<Void> assignRoles(@PathVariable Long id, @Valid @RequestBody UserDtos.AssignRoleDTO dto) {
         userRoleMapper.deleteByUserId(id);
-        List<Long> roleIds = body.getOrDefault("roleIds", List.of());
+        List<Long> roleIds = dto.getRoleIds() == null ? List.of() : dto.getRoleIds();
         for (Long rid : roleIds) {
             userRoleMapper.insertUserRole(id, rid);
         }
+        // 角色变更：该用户旧会话权限失效，强制重新登录
+        sessionService.removeSession(id);
         return R.ok();
     }
 
@@ -146,8 +160,14 @@ public class SystemUserController {
     @PostMapping("/role")
     @PreAuthorize("hasAuthority('system:role:add')")
     @OperLog(title = "角色管理", businessType = 1)
-    public R<Void> addRole(@RequestBody SysRole role) {
-        if (role.getRoleName() == null || role.getRoleKey() == null) throw new BusinessException("参数不完整");
+    @Idempotent
+    public R<Void> addRole(@Valid @RequestBody AdminDtos.RoleDTO dto) {
+        SysRole role = new SysRole();
+        role.setRoleName(dto.getRoleName());
+        role.setRoleKey(dto.getRoleKey());
+        role.setSort(dto.getSort() == null ? 0 : dto.getSort());
+        role.setStatus(dto.getStatus() == null ? 0 : dto.getStatus());
+        role.setRemark(dto.getRemark());
         roleMapper.insert(role);
         return R.ok();
     }
@@ -155,8 +175,15 @@ public class SystemUserController {
     @PutMapping("/role")
     @PreAuthorize("hasAuthority('system:role:edit')")
     @OperLog(title = "角色管理", businessType = 2)
-    public R<Void> editRole(@RequestBody SysRole role) {
-        if (role.getId() == 1) throw new BusinessException("不能修改内置管理员角色");
+    public R<Void> editRole(@Valid @RequestBody AdminDtos.RoleDTO dto) {
+        if (dto.getId() == null || dto.getId() == 1) throw new BusinessException("不能修改内置管理员角色");
+        SysRole role = new SysRole();
+        role.setId(dto.getId());
+        role.setRoleName(dto.getRoleName());
+        role.setRoleKey(dto.getRoleKey());
+        role.setSort(dto.getSort());
+        role.setStatus(dto.getStatus());
+        role.setRemark(dto.getRemark());
         roleMapper.updateById(role);
         return R.ok();
     }
@@ -182,12 +209,16 @@ public class SystemUserController {
     @PreAuthorize("hasAuthority('system:role:assignPerm')")
     @OperLog(title = "角色管理", businessType = 2)
     @Transactional
-    public R<Void> assignPerms(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
+    public R<Void> assignPerms(@PathVariable Long id, @Valid @RequestBody AdminDtos.AssignPermDTO dto) {
         if (id == 1) throw new BusinessException("内置管理员拥有全部权限");
         userRoleMapper.deletePermByRoleId(id);
-        List<Long> permIds = body.getOrDefault("permIds", List.of());
+        List<Long> permIds = dto.getPermIds() == null ? List.of() : dto.getPermIds();
         if (!permIds.isEmpty()) {
             userRoleMapper.insertRolePerms(id, permIds);
+        }
+        // 权限变更：该角色下所有在线用户会话失效（旧权限立即作废）
+        for (Long uid : userRoleMapper.selectUserIdsByRole(id)) {
+            sessionService.removeSession(uid);
         }
         return R.ok();
     }

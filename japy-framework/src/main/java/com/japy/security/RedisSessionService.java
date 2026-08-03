@@ -61,9 +61,9 @@ public class RedisSessionService {
         redis.delete(REFRESH_KEY + userId);
     }
 
-    /** 记录登录失败次数，返回当前次数 */
-    public long incrFailCount(String username, Duration expire) {
-        String key = FAIL_KEY + username;
+    /** 记录登录失败次数（按 账号+IP 复合维度，防攻击者锁定他人账号），返回当前次数 */
+    public long incrFailCount(String username, String ip, Duration expire) {
+        String key = FAIL_KEY + username + ":" + ip;
         Long count = redis.opsForValue().increment(key);
         if (count != null && count == 1) {
             redis.expire(key, expire);
@@ -71,7 +71,7 @@ public class RedisSessionService {
         return count == null ? 0 : count;
     }
 
-    public void clearFailCount(String username) {
-        redis.delete(FAIL_KEY + username);
+    public void clearFailCount(String username, String ip) {
+        redis.delete(FAIL_KEY + username + ":" + ip);
     }
 }
