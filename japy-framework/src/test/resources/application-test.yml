@@ -1,0 +1,7 @@
+# 集成测试配置：独立测试库，隔离开发数据
+# 其余配置（Redis/RocketMQ/Flyway/JWT 等）继承 application.yml
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/japy_moments_test
+    username: postgres
+    password: root
