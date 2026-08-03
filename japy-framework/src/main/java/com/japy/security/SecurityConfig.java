@@ -1,6 +1,7 @@
 package com.japy.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -23,9 +24,9 @@ import java.util.List;
 /**
  * Spring Security 配置：
  * - 无状态（JWT），会话不落服务端
- * - /auth/** 匿名；其他接口需认证
+ * - /auth/** 匿名；其他接口需认证（actuator 仅暴露 health/info）
  * - 方法级鉴权 @PreAuthorize 开启（RBAC 按钮权限）
- * - CORS 全开（前后端分离开发）
+ * - CORS 白名单配置化（cors.allowed-origins）
  */
 @Configuration
 @EnableWebSecurity
@@ -35,6 +36,10 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    /** 允许跨域的前端来源（yml 配置，禁止 *） */
+    @Value("${cors.allowed-origins:http://localhost:3002,http://localhost:3003}")
+    private String[] allowedOrigins;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
@@ -42,7 +47,7 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/**", "/doc.html", "/swagger-ui/**", "/v3/api-docs/**",
-                        "/actuator/**", "/common/**").permitAll()
+                        "/actuator/health", "/actuator/info", "/common/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(ex -> ex
@@ -73,7 +78,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        // 白名单来源（yml 配置），不开放 *（配合 credentials）
+        config.setAllowedOrigins(java.util.Arrays.asList(allowedOrigins));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

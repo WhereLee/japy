@@ -29,11 +29,22 @@ rocketmq:
   topics:
     oper-log: japy_oper_log
 
-# JWT
+# JWT（生产环境通过环境变量 JWT_SECRET 覆盖）
 jwt:
-  secret: japy-framework-secret-key-must-be-at-least-256-bits-long!!
+  secret: ${JWT_SECRET:japy-framework-secret-key-must-be-at-least-256-bits-long!!}
   access-expire: 7200          # access token 有效期（秒）2h
   refresh-expire: 604800       # refresh token 有效期（秒）7d
+
+# CORS 白名单（前后端分离部署时按实际域名配置）
+cors:
+  allowed-origins: http://localhost:3002,http://localhost:3003,http://localhost:5173
+
+# Actuator：仅暴露健康检查与信息（不暴露 env/beans 等敏感端点）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
 
 # 登录防爆破
 login:

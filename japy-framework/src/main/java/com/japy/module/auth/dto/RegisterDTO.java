@@ -1,5 +1,6 @@
 package com.japy.module.auth.dto;
 
+import com.japy.aspect.Xss;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -20,5 +21,6 @@ public class RegisterDTO {
 
     @NotBlank(message = "昵称不能为空")
     @Size(max = 20, message = "昵称最长 20 字")
+    @Xss
     private String nickname;
 }

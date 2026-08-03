@@ -1,6 +1,7 @@
 package com.japy.module.user.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -10,6 +11,8 @@ public class SysUser {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String username;
+    /** 密码哈希：禁止序列化外泄（可离线爆破），仅用于数据库读写 */
+    @JsonIgnore
     private String password;
     private String nickname;
     private String avatar;

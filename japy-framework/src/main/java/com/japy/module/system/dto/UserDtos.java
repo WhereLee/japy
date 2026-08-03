@@ -1,5 +1,6 @@
 package com.japy.module.system.dto;
 
+import com.japy.aspect.Xss;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -25,6 +26,7 @@ public class UserDtos {
 
         @NotBlank(message = "昵称不能为空")
         @Size(max = 20, message = "昵称最长 20 字")
+        @Xss
         private String nickname;
 
         private String email;
@@ -40,6 +42,7 @@ public class UserDtos {
 
         @NotBlank(message = "昵称不能为空")
         @Size(max = 20, message = "昵称最长 20 字")
+        @Xss
         private String nickname;
 
         private String email;
