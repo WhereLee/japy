@@ -103,3 +103,9 @@ migrate_to_db.py
 
 # 日志
 logs/
+
+# === japy-framework ===
+# 本地密钥配置（LLM API key 等，绝不入库）
+japy-framework/src/main/resources/application-local.yml
+# 构建产物
+japy-framework/target/
