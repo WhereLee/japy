@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: japy-framework
+  profiles:
+    # 本地开发默认加载 application-local.yml（含密钥，不入库）；测试用 @ActiveProfiles("test") 覆盖
+    default: local
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/japy_moments
@@ -28,6 +31,21 @@ rocketmq:
   consumer-group: japy-framework-consumer
   topics:
     oper-log: japy_oper_log
+
+# AI 运维分析顾问（Monitor Agent）
+ai:
+  llm:
+    # API key：本地走 application-local.yml，生产走环境变量 DEEPSEEK_API_KEY，绝不写死入库
+    api-key: ${DEEPSEEK_API_KEY:}
+    # base-url/model 默认与 sys_config 一致，可用参数管理覆盖
+    base-url: https://api.deepseek.com/v1
+    model: deepseek-v4-flash
+    timeout-seconds: 30
+  monitor:
+    # 检测调度间隔（毫秒）
+    scheduler-interval-ms: 1800000
+    # 即时通知的最小严重级别（2警告 3严重）
+    notify-severity: 3
 
 # JWT（生产环境通过环境变量 JWT_SECRET 覆盖）
 jwt:

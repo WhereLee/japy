@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
@@ -16,8 +17,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 /**
  * RBAC 权限 + 防护机制测试：
  * 权限拦截（401/403）/ 幂等防重 / 登录限流 / XSS 双路径防护 / 密码不外泄。
+ * @Transactional：测试数据回滚，不污染测试库。
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Transactional
 class RbacGuardTest extends AbstractIntegrationTest {
 
     @Test

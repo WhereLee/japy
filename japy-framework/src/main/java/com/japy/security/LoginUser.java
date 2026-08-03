@@ -28,6 +28,8 @@ public class LoginUser implements UserDetails {
 
     public Long getUserId() { return user.getId(); }
 
+    public String getNickname() { return user.getNickname(); }
+
     /** 反序列化时忽略（GrantedAuthority 为接口，由 roles/perms 动态构造） */
     @JsonIgnore
     @Override

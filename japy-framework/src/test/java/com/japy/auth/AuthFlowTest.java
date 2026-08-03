@@ -6,6 +6,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
@@ -14,8 +15,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * 认证链路集成测试：注册/登录/刷新轮换/登出/失败锁定。
  * 覆盖：JWT 双 token、Redis 会话轮换（防重放）、SVG 头像生成、锁定策略。
+ * @Transactional：测试数据（用户/登录日志）回滚，不污染测试库。
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Transactional
 class AuthFlowTest extends AbstractIntegrationTest {
 
     @Test

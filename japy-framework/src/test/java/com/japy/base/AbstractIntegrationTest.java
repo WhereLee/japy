@@ -88,6 +88,8 @@ public abstract class AbstractIntegrationTest {
 
     /** 管理员登录（Flyway 预置账号 admin/admin123），返回 access token */
     protected String loginAsAdmin() throws Exception {
+        // 登录限流 3 次/秒（按 IP）：多个测试类共享同一 MockMvc IP，加间隔避免互相打满限流
+        Thread.sleep(500);
         JsonNode node = postJson("/auth/login", Map.of("username", "admin", "password", "admin123"), null);
         return node.get("data").get("accessToken").asText();
     }
