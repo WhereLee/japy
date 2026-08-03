@@ -1,0 +1,56 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: japy-framework
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/japy_moments
+    username: postgres
+    password: root
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    encoding: UTF-8
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 3s
+
+# RocketMQ（本机：D:\rocketmq-5.3.1，NameServer 9876）
+rocketmq:
+  name-server: localhost:9876
+  producer-group: japy-framework-producer
+  consumer-group: japy-framework-consumer
+  topics:
+    oper-log: japy_oper_log
+
+# JWT
+jwt:
+  secret: japy-framework-secret-key-must-be-at-least-256-bits-long!!
+  access-expire: 7200          # access token 有效期（秒）2h
+  refresh-expire: 604800       # refresh token 有效期（秒）7d
+
+# 登录防爆破
+login:
+  max-fail: 5                  # 连续失败 N 次锁定
+  lock-minutes: 30             # 锁定时长（分钟）
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+springdoc:
+  swagger-ui:
+    path: /doc.html
+
+logging:
+  level:
+    com.japy: debug
