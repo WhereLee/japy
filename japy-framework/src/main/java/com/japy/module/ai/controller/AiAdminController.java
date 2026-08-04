@@ -48,7 +48,7 @@ public class AiAdminController {
     // ---------- 报告 ----------
 
     @GetMapping("/report")
-    @PreAuthorize("hasAuthority('ai:report:list')")
+    @PreAuthorize("@ss.hasPermi('ai:report:list')")
     public R<Map<String, Object>> report() {
         return R.ok(reportService.report());
     }
@@ -57,14 +57,14 @@ public class AiAdminController {
 
     /** 手动触发一轮检测（调试/演示用） */
     @PostMapping("/events/run")
-    @PreAuthorize("hasAuthority('ai:event:run')")
+    @PreAuthorize("@ss.hasPermi('ai:event:run')")
     @OperLog(title = "AI 监测", businessType = 1)
     public R<Integer> runNow() {
         return R.ok(monitorService.checkAll());
     }
 
     @GetMapping("/events")
-    @PreAuthorize("hasAuthority('ai:event:list')")
+    @PreAuthorize("@ss.hasPermi('ai:event:list')")
     public R<IPage<AiMonitorEvent>> events(@RequestParam(defaultValue = "1") int page,
                                            @RequestParam(defaultValue = "20") int size,
                                            @RequestParam(required = false) Integer status,
@@ -78,7 +78,7 @@ public class AiAdminController {
 
     /** 确认（问题已处理/已知晓） */
     @PostMapping("/events/{id}/confirm")
-    @PreAuthorize("hasAuthority('ai:event:confirm')")
+    @PreAuthorize("@ss.hasPermi('ai:event:confirm')")
     @OperLog(title = "AI 监测", businessType = 2)
     public R<Void> confirm(@PathVariable Long id) {
         setEventStatus(id, 2);
@@ -87,7 +87,7 @@ public class AiAdminController {
 
     /** 忽略（误报） */
     @PostMapping("/events/{id}/ignore")
-    @PreAuthorize("hasAuthority('ai:event:confirm')")
+    @PreAuthorize("@ss.hasPermi('ai:event:confirm')")
     @OperLog(title = "AI 监测", businessType = 2)
     public R<Void> ignore(@PathVariable Long id) {
         setEventStatus(id, 3);
@@ -108,7 +108,7 @@ public class AiAdminController {
     // ---------- 建议卡 ----------
 
     @GetMapping("/suggestions")
-    @PreAuthorize("hasAuthority('ai:suggestion:handle')")
+    @PreAuthorize("@ss.hasPermi('ai:suggestion:handle')")
     public R<IPage<AiSuggestion>> suggestions(@RequestParam(defaultValue = "1") int page,
                                               @RequestParam(defaultValue = "20") int size,
                                               @RequestParam(required = false) Integer status) {
@@ -116,7 +116,7 @@ public class AiAdminController {
     }
 
     @PostMapping("/suggestions/{id}/approve")
-    @PreAuthorize("hasAuthority('ai:suggestion:handle')")
+    @PreAuthorize("@ss.hasPermi('ai:suggestion:handle')")
     @OperLog(title = "AI 建议卡", businessType = 2)
     public R<Void> approve(@PathVariable Long id) {
         suggestionService.approve(id);
@@ -124,7 +124,7 @@ public class AiAdminController {
     }
 
     @PostMapping("/suggestions/{id}/reject")
-    @PreAuthorize("hasAuthority('ai:suggestion:handle')")
+    @PreAuthorize("@ss.hasPermi('ai:suggestion:handle')")
     @OperLog(title = "AI 建议卡", businessType = 2)
     public R<Void> reject(@PathVariable Long id) {
         suggestionService.reject(id);
@@ -132,7 +132,7 @@ public class AiAdminController {
     }
 
     @PostMapping("/suggestions/{id}/execute")
-    @PreAuthorize("hasAuthority('ai:suggestion:handle')")
+    @PreAuthorize("@ss.hasPermi('ai:suggestion:handle')")
     @OperLog(title = "AI 建议卡", businessType = 2)
     public R<Void> execute(@PathVariable Long id) {
         suggestionService.execute(id);
@@ -142,7 +142,7 @@ public class AiAdminController {
     // ---------- 反馈闭环 ----------
 
     @PostMapping("/feedback")
-    @PreAuthorize("hasAuthority('ai:feedback:add')")
+    @PreAuthorize("@ss.hasPermi('ai:feedback:add')")
     @RateLimit(permitsPerSecond = 5, key = "ai-feedback")
     @OperLog(title = "AI 反馈", businessType = 1)
     public R<Void> feedback(@Valid @RequestBody AiDtos.FeedbackDTO dto) {
@@ -152,13 +152,13 @@ public class AiAdminController {
     }
 
     @GetMapping("/feedback/stats")
-    @PreAuthorize("hasAuthority('ai:feedback:add')")
+    @PreAuthorize("@ss.hasPermi('ai:feedback:add')")
     public R<java.util.List<Map<String, Object>>> feedbackStats() {
         return R.ok(feedbackService.stats());
     }
 
     @GetMapping("/feedback/hint")
-    @PreAuthorize("hasAuthority('ai:feedback:add')")
+    @PreAuthorize("@ss.hasPermi('ai:feedback:add')")
     public R<Map<String, Object>> thresholdHint(@RequestParam String monitorCode) {
         return R.ok(feedbackService.thresholdHint(monitorCode));
     }
@@ -167,14 +167,14 @@ public class AiAdminController {
 
     /** 手动触发：LLM 分析近 7 天反馈 → 洞察（待人工应用） */
     @PostMapping("/insight/analyze")
-    @PreAuthorize("hasAuthority('ai:insight:analyze')")
+    @PreAuthorize("@ss.hasPermi('ai:insight:analyze')")
     @OperLog(title = "AI 反馈分析", businessType = 1)
     public R<AiFeedbackInsight> analyzeInsight() {
         return R.ok(feedbackService.analyzeFeedback());
     }
 
     @GetMapping("/insight/list")
-    @PreAuthorize("hasAuthority('ai:insight:analyze')")
+    @PreAuthorize("@ss.hasPermi('ai:insight:analyze')")
     public R<IPage<AiFeedbackInsight>> insightList(@RequestParam(defaultValue = "1") int page,
                                                    @RequestParam(defaultValue = "20") int size) {
         return R.ok(insightMapper.selectPage(new Page<>(page, size),
@@ -184,7 +184,7 @@ public class AiAdminController {
     // ---------- 站内通知 ----------
 
     @GetMapping("/notifications")
-    @PreAuthorize("hasAuthority('ai:event:list')")
+    @PreAuthorize("@ss.hasPermi('ai:event:list')")
     public R<IPage<SysNotification>> notifications(@RequestParam(defaultValue = "1") int page,
                                                    @RequestParam(defaultValue = "20") int size) {
         return R.ok(notificationMapper.selectPage(new Page<>(page, size),

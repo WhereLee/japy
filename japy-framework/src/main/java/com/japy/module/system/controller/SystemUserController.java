@@ -45,7 +45,7 @@ public class SystemUserController {
     // ==================== 用户管理 ====================
 
     @GetMapping("/user/list")
-    @PreAuthorize("hasAuthority('system:user:list')")
+    @PreAuthorize("@ss.hasPermi('system:user:list')")
     public R<PageResult<SysUser>> userList(@RequestParam(defaultValue = "1") int page,
                                            @RequestParam(defaultValue = "20") int size,
                                            @RequestParam(required = false) String keyword) {
@@ -61,7 +61,7 @@ public class SystemUserController {
     }
 
     @PostMapping("/user")
-    @PreAuthorize("hasAuthority('system:user:add')")
+    @PreAuthorize("@ss.hasPermi('system:user:add')")
     @OperLog(title = "用户管理", businessType = 1)
     @Idempotent
     public R<Void> addUser(@Valid @RequestBody UserDtos.AddDTO dto) {
@@ -82,7 +82,7 @@ public class SystemUserController {
     }
 
     @PutMapping("/user")
-    @PreAuthorize("hasAuthority('system:user:edit')")
+    @PreAuthorize("@ss.hasPermi('system:user:edit')")
     @OperLog(title = "用户管理", businessType = 2)
     public R<Void> editUser(@Valid @RequestBody UserDtos.EditDTO dto) {
         SysUser db = userMapper.selectById(dto.getId());
@@ -96,7 +96,7 @@ public class SystemUserController {
     }
 
     @DeleteMapping("/user/{id}")
-    @PreAuthorize("hasAuthority('system:user:delete')")
+    @PreAuthorize("@ss.hasPermi('system:user:delete')")
     @OperLog(title = "用户管理", businessType = 3)
     public R<Void> deleteUser(@PathVariable Long id) {
         if (id == 1) throw new BusinessException("不能删除内置管理员");
@@ -110,7 +110,7 @@ public class SystemUserController {
 
     /** 重置密码（默认 123456） */
     @PutMapping("/user/{id}/resetPwd")
-    @PreAuthorize("hasAuthority('system:user:resetPwd')")
+    @PreAuthorize("@ss.hasPermi('system:user:resetPwd')")
     @OperLog(title = "用户管理", businessType = 2)
     public R<Void> resetPwd(@PathVariable Long id) {
         SysUser u = userMapper.selectById(id);
@@ -122,7 +122,7 @@ public class SystemUserController {
 
     /** 启用/停用 */
     @PutMapping("/user/{id}/status")
-    @PreAuthorize("hasAuthority('system:user:status')")
+    @PreAuthorize("@ss.hasPermi('system:user:status')")
     @OperLog(title = "用户管理", businessType = 2)
     public R<Void> changeStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
         if (id == 1) throw new BusinessException("不能停用内置管理员");
@@ -135,7 +135,7 @@ public class SystemUserController {
 
     /** 分配角色 */
     @PutMapping("/user/{id}/roles")
-    @PreAuthorize("hasAuthority('system:user:assignRole')")
+    @PreAuthorize("@ss.hasPermi('system:user:assignRole')")
     @OperLog(title = "用户管理", businessType = 2)
     @Transactional
     public R<Void> assignRoles(@PathVariable Long id, @Valid @RequestBody UserDtos.AssignRoleDTO dto) {
@@ -152,13 +152,13 @@ public class SystemUserController {
     // ==================== 角色管理 ====================
 
     @GetMapping("/role/list")
-    @PreAuthorize("hasAuthority('system:role:list')")
+    @PreAuthorize("@ss.hasPermi('system:role:list')")
     public R<List<SysRole>> roleList() {
         return R.ok(roleMapper.selectList(new LambdaQueryWrapper<SysRole>().orderByAsc(SysRole::getSort)));
     }
 
     @PostMapping("/role")
-    @PreAuthorize("hasAuthority('system:role:add')")
+    @PreAuthorize("@ss.hasPermi('system:role:add')")
     @OperLog(title = "角色管理", businessType = 1)
     @Idempotent
     public R<Void> addRole(@Valid @RequestBody AdminDtos.RoleDTO dto) {
@@ -173,7 +173,7 @@ public class SystemUserController {
     }
 
     @PutMapping("/role")
-    @PreAuthorize("hasAuthority('system:role:edit')")
+    @PreAuthorize("@ss.hasPermi('system:role:edit')")
     @OperLog(title = "角色管理", businessType = 2)
     public R<Void> editRole(@Valid @RequestBody AdminDtos.RoleDTO dto) {
         if (dto.getId() == null || dto.getId() == 1) throw new BusinessException("不能修改内置管理员角色");
@@ -189,7 +189,7 @@ public class SystemUserController {
     }
 
     @DeleteMapping("/role/{id}")
-    @PreAuthorize("hasAuthority('system:role:delete')")
+    @PreAuthorize("@ss.hasPermi('system:role:delete')")
     @OperLog(title = "角色管理", businessType = 3)
     public R<Void> deleteRole(@PathVariable Long id) {
         if (id <= 2) throw new BusinessException("不能删除内置角色");
@@ -199,14 +199,14 @@ public class SystemUserController {
 
     /** 查询角色已分配的权限 id 列表 */
     @GetMapping("/role/{id}/perms")
-    @PreAuthorize("hasAuthority('system:role:assignPerm')")
+    @PreAuthorize("@ss.hasPermi('system:role:assignPerm')")
     public R<List<Long>> rolePerms(@PathVariable Long id) {
         return R.ok(userRoleMapper.selectPermIds(id));
     }
 
     /** 分配权限 */
     @PutMapping("/role/{id}/perms")
-    @PreAuthorize("hasAuthority('system:role:assignPerm')")
+    @PreAuthorize("@ss.hasPermi('system:role:assignPerm')")
     @OperLog(title = "角色管理", businessType = 2)
     @Transactional
     public R<Void> assignPerms(@PathVariable Long id, @Valid @RequestBody AdminDtos.AssignPermDTO dto) {
@@ -226,13 +226,13 @@ public class SystemUserController {
     // ==================== 权限管理 ====================
 
     @GetMapping("/perm/tree")
-    @PreAuthorize("hasAuthority('system:perm:list')")
+    @PreAuthorize("@ss.hasPermi('system:perm:list')")
     public R<List<SysPermission>> permTree() {
         return R.ok(permMapper.selectList(new LambdaQueryWrapper<SysPermission>().orderByAsc(SysPermission::getSort)));
     }
 
     @PostMapping("/perm")
-    @PreAuthorize("hasAuthority('system:perm:add')")
+    @PreAuthorize("@ss.hasPermi('system:perm:add')")
     @OperLog(title = "权限管理", businessType = 1)
     public R<Void> addPerm(@RequestBody SysPermission perm) {
         permMapper.insert(perm);
@@ -240,7 +240,7 @@ public class SystemUserController {
     }
 
     @PutMapping("/perm")
-    @PreAuthorize("hasAuthority('system:perm:edit')")
+    @PreAuthorize("@ss.hasPermi('system:perm:edit')")
     @OperLog(title = "权限管理", businessType = 2)
     public R<Void> editPerm(@RequestBody SysPermission perm) {
         permMapper.updateById(perm);
@@ -248,7 +248,7 @@ public class SystemUserController {
     }
 
     @DeleteMapping("/perm/{id}")
-    @PreAuthorize("hasAuthority('system:perm:delete')")
+    @PreAuthorize("@ss.hasPermi('system:perm:delete')")
     @OperLog(title = "权限管理", businessType = 3)
     public R<Void> deletePerm(@PathVariable Long id) {
         permMapper.deleteById(id);

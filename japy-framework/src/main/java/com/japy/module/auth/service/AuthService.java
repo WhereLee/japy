@@ -134,6 +134,24 @@ public class AuthService {
         }
     }
 
+    /** 当前用户信息 VO（不含敏感字段），供 /auth/info 使用 */
+    public com.japy.module.auth.vo.UserInfoVO userInfoVO(Long userId) {
+        SysUser u = userMapper.selectById(userId);
+        if (u == null) {
+            throw new com.japy.common.BusinessException("用户不存在");
+        }
+        com.japy.module.auth.vo.UserInfoVO vo = new com.japy.module.auth.vo.UserInfoVO();
+        vo.setId(u.getId());
+        vo.setUsername(u.getUsername());
+        vo.setNickname(u.getNickname());
+        vo.setAvatar(u.getAvatar());
+        vo.setEmail(u.getEmail());
+        vo.setPhone(u.getPhone());
+        vo.setSex(u.getSex());
+        vo.setCreateTime(u.getCreateTime());
+        return vo;
+    }
+
     private TokenVO buildToken(SysUser user, HttpServletRequest request) {
         LoginUser loginUser = (LoginUser) userDetailsService.loadUserByUsername(user.getUsername());
         String access = jwtUtil.createAccessToken(user.getId(), user.getUsername());

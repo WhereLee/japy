@@ -25,7 +25,7 @@ public class SystemNoticeController {
     private final SysNoticeMapper noticeMapper;
 
     @GetMapping("/list")
-    @PreAuthorize("hasAuthority('system:notice:list')")
+    @PreAuthorize("@ss.hasPermi('system:notice:list')")
     public R<PageResult<SysNotice>> list(@RequestParam(defaultValue = "1") int page,
                                          @RequestParam(defaultValue = "20") int size) {
         Page<SysNotice> p = noticeMapper.selectPage(new Page<>(page, size),
@@ -34,7 +34,7 @@ public class SystemNoticeController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('system:notice:add')")
+    @PreAuthorize("@ss.hasPermi('system:notice:add')")
     @OperLog(title = "公告管理", businessType = 1)
     public R<Void> add(@Valid @RequestBody AdminDtos.NoticeDTO dto) {
         SysNotice notice = new SysNotice();
@@ -47,7 +47,7 @@ public class SystemNoticeController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('system:notice:edit')")
+    @PreAuthorize("@ss.hasPermi('system:notice:edit')")
     @OperLog(title = "公告管理", businessType = 2)
     public R<Void> edit(@Valid @RequestBody AdminDtos.NoticeDTO dto) {
         SysNotice notice = new SysNotice();
@@ -61,7 +61,7 @@ public class SystemNoticeController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('system:notice:delete')")
+    @PreAuthorize("@ss.hasPermi('system:notice:delete')")
     @OperLog(title = "公告管理", businessType = 3)
     public R<Void> delete(@PathVariable Long id) {
         noticeMapper.deleteById(id);

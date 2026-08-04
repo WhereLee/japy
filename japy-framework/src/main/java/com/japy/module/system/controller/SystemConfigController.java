@@ -36,19 +36,19 @@ public class SystemConfigController {
     // ==================== 字典管理 ====================
 
     @GetMapping("/dict/type/list")
-    @PreAuthorize("hasAuthority('system:dict:list')")
+    @PreAuthorize("@ss.hasPermi('system:dict:list')")
     public R<List<SysDictType>> dictTypeList() {
         return R.ok(dictTypeMapper.selectList(new LambdaQueryWrapper<SysDictType>().orderByAsc(SysDictType::getId)));
     }
 
     @GetMapping("/dict/data/{dictType}")
-    @PreAuthorize("hasAuthority('system:dict:list')")
+    @PreAuthorize("@ss.hasPermi('system:dict:list')")
     public R<List<SysDictData>> dictData(@PathVariable String dictType) {
         return R.ok(dictCacheService.getData(dictType));
     }
 
     @PostMapping("/dict/type")
-    @PreAuthorize("hasAuthority('system:dict:add')")
+    @PreAuthorize("@ss.hasPermi('system:dict:add')")
     @OperLog(title = "字典管理", businessType = 1)
     public R<Void> addDictType(@Valid @RequestBody AdminDtos.DictTypeDTO dto) {
         SysDictType type = new SysDictType();
@@ -62,7 +62,7 @@ public class SystemConfigController {
     }
 
     @PostMapping("/dict/data")
-    @PreAuthorize("hasAuthority('system:dict:add')")
+    @PreAuthorize("@ss.hasPermi('system:dict:add')")
     @OperLog(title = "字典管理", businessType = 1)
     public R<Void> addDictData(@Valid @RequestBody AdminDtos.DictDataDTO dto) {
         SysDictData data = new SysDictData();
@@ -78,7 +78,7 @@ public class SystemConfigController {
     }
 
     @PutMapping("/dict/data")
-    @PreAuthorize("hasAuthority('system:dict:edit')")
+    @PreAuthorize("@ss.hasPermi('system:dict:edit')")
     @OperLog(title = "字典管理", businessType = 2)
     public R<Void> editDictData(@Valid @RequestBody AdminDtos.DictDataDTO dto) {
         SysDictData data = new SysDictData();
@@ -94,7 +94,7 @@ public class SystemConfigController {
     }
 
     @DeleteMapping("/dict/data/{id}")
-    @PreAuthorize("hasAuthority('system:dict:delete')")
+    @PreAuthorize("@ss.hasPermi('system:dict:delete')")
     @OperLog(title = "字典管理", businessType = 3)
     public R<Void> deleteDictData(@PathVariable Long id) {
         SysDictData data = dictDataMapper.selectById(id);
@@ -108,13 +108,13 @@ public class SystemConfigController {
     // ==================== 参数管理 ====================
 
     @GetMapping("/config/list")
-    @PreAuthorize("hasAuthority('system:config:list')")
+    @PreAuthorize("@ss.hasPermi('system:config:list')")
     public R<List<SysConfig>> configList() {
         return R.ok(configMapper.selectList(new LambdaQueryWrapper<SysConfig>().orderByAsc(SysConfig::getId)));
     }
 
     @PostMapping("/config")
-    @PreAuthorize("hasAuthority('system:config:add')")
+    @PreAuthorize("@ss.hasPermi('system:config:add')")
     @OperLog(title = "参数管理", businessType = 1)
     public R<Void> addConfig(@Valid @RequestBody AdminDtos.ConfigDTO dto) {
         SysConfig config = new SysConfig();
@@ -127,7 +127,7 @@ public class SystemConfigController {
     }
 
     @PutMapping("/config")
-    @PreAuthorize("hasAuthority('system:config:edit')")
+    @PreAuthorize("@ss.hasPermi('system:config:edit')")
     @OperLog(title = "参数管理", businessType = 2)
     public R<Void> editConfig(@Valid @RequestBody AdminDtos.ConfigDTO dto) {
         SysConfig config = new SysConfig();
@@ -141,7 +141,7 @@ public class SystemConfigController {
     }
 
     @DeleteMapping("/config/{id}")
-    @PreAuthorize("hasAuthority('system:config:delete')")
+    @PreAuthorize("@ss.hasPermi('system:config:delete')")
     @OperLog(title = "参数管理", businessType = 3)
     public R<Void> deleteConfig(@PathVariable Long id) {
         configMapper.deleteById(id);

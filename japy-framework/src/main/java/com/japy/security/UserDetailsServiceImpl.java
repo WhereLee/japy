@@ -11,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /** 认证查询：按用户名加载用户 + 角色 + 权限 */
 @Service
 @RequiredArgsConstructor
@@ -30,8 +32,14 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         if (user.getStatus() != 0) {
             throw new BusinessException("账号已停用，请联系管理员");
         }
-        return new LoginUser(user,
-                userRoleMapper.selectRoleKeys(user.getId()),
-                userRoleMapper.selectPermKeys(user.getId()));
+        List<String> roles = userRoleMapper.selectRoleKeys(user.getId());
+        List<String> perms;
+        // 超管通配（若依模式）：admin 角色不逐条绑权限，避免新增权限点后漏绑
+        if (roles.contains("admin")) {
+            perms = List.of("*:*:*");
+        } else {
+            perms = userRoleMapper.selectPermKeys(user.getId());
+        }
+        return new LoginUser(user, roles, perms);
     }
 }

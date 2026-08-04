@@ -37,7 +37,7 @@ public class SystemLogController {
     // ==================== 操作日志 ====================
 
     @GetMapping("/operlog/list")
-    @PreAuthorize("hasAuthority('system:operlog:list')")
+    @PreAuthorize("@ss.hasPermi('system:operlog:list')")
     public R<PageResult<SysOperLog>> operLogList(@RequestParam(defaultValue = "1") int page,
                                                  @RequestParam(defaultValue = "20") int size) {
         Page<SysOperLog> p = operLogMapper.selectPage(new Page<>(page, size),
@@ -46,7 +46,7 @@ public class SystemLogController {
     }
 
     @DeleteMapping("/operlog/clean")
-    @PreAuthorize("hasAuthority('system:operlog:clean')")
+    @PreAuthorize("@ss.hasPermi('system:operlog:clean')")
     @OperLog(title = "操作日志", businessType = 3)
     public R<Void> cleanOperLog() {
         operLogMapper.delete(null);
@@ -56,7 +56,7 @@ public class SystemLogController {
     // ==================== 登录日志 ====================
 
     @GetMapping("/loginlog/list")
-    @PreAuthorize("hasAuthority('system:loginlog:list')")
+    @PreAuthorize("@ss.hasPermi('system:loginlog:list')")
     public R<PageResult<SysLoginLog>> loginLogList(@RequestParam(defaultValue = "1") int page,
                                                    @RequestParam(defaultValue = "20") int size) {
         Page<SysLoginLog> p = loginLogMapper.selectPage(new Page<>(page, size),
@@ -67,7 +67,7 @@ public class SystemLogController {
     // ==================== 在线用户 ====================
 
     @GetMapping("/online/list")
-    @PreAuthorize("hasAuthority('system:online:list')")
+    @PreAuthorize("@ss.hasPermi('system:online:list')")
     public R<List<Map<String, Object>>> onlineList() {
         List<Map<String, Object>> result = new ArrayList<>();
         try {
@@ -89,7 +89,7 @@ public class SystemLogController {
     }
 
     @DeleteMapping("/online/{userId}")
-    @PreAuthorize("hasAuthority('system:online:forceLogout')")
+    @PreAuthorize("@ss.hasPermi('system:online:forceLogout')")
     @OperLog(title = "在线用户", businessType = 3)
     public R<Void> forceLogout(@PathVariable Long userId) {
         sessionService.removeSession(userId);
@@ -99,7 +99,7 @@ public class SystemLogController {
     // ==================== 仪表盘 ====================
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAuthority('dashboard:view')")
+    @PreAuthorize("@ss.hasPermi('dashboard:view')")
     public R<Map<String, Object>> dashboard() {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("userCount", userMapper.selectCount(new LambdaQueryWrapper<com.japy.module.user.entity.SysUser>()
