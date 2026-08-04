@@ -32,7 +32,7 @@ public class MenuTreeService {
                     .eq(SysPermission::getStatus, 0)
                     .orderByAsc(SysPermission::getSort));
         }
-        List<Long> permIds = userRoleMapper.selectPermIds(userId);
+        List<Long> permIds = userRoleMapper.selectPermIdsByUser(userId);
         if (permIds.isEmpty()) {
             return List.of();
         }

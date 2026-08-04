@@ -24,6 +24,12 @@ public interface SysUserRoleMapper {
     @Select("SELECT role_id FROM sys_user_role WHERE user_id = #{userId}")
     List<Long> selectRoleIds(@Param("userId") Long userId);
 
+    /** 按用户查其所有角色绑定的权限 id（DISTINCT，供菜单树组装） */
+    @Select("SELECT DISTINCT rp.perm_id FROM sys_role_permission rp " +
+            "JOIN sys_user_role ur ON ur.role_id = rp.role_id " +
+            "WHERE ur.user_id = #{userId}")
+    List<Long> selectPermIdsByUser(@Param("userId") Long userId);
+
     @Select("SELECT user_id FROM sys_user_role WHERE role_id = #{roleId}")
     List<Long> selectUserIdsByRole(@Param("roleId") Long roleId);
 
