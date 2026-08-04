@@ -3,7 +3,7 @@ package com.japy.aspect;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.japy.module.system.entity.SysOperLog;
 import com.japy.module.system.mapper.SysOperLogMapper;
-import com.japy.mq.MqService;
+import com.japy.mq.LogDeliveryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,13 +13,14 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.slf4j.MDC;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 操作日志切面：@OperLog 注解方法 → 组装日志 → 发 RocketMQ 异步落库。
- * MQ 不可用时降级为同步落库（保证日志不丢）。
+ * 操作日志切面：@OperLog 注解方法 → 组装日志（含 traceId）→ 多级降级投递（MQ → Redis Stream → 同步落库）。
+ * 日志不丢：两级通道都失败才同步落库；重复消费由 trace_id 唯一索引幂等。
  */
 @Slf4j
 @Aspect
@@ -27,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class OperLogAspect {
 
-    private final MqService mqService;
+    private final LogDeliveryService deliveryService;
     private final SysOperLogMapper operLogMapper;
     private final ObjectMapper objectMapper;
 
@@ -51,8 +52,10 @@ public class OperLogAspect {
         } finally {
             try {
                 SysOperLog entry = build(pjp, operLog, System.currentTimeMillis() - start, error);
-                if (!mqService.send(operLogTopic, "oper", objectMapper.writeValueAsString(entry))) {
-                    // 降级：同步落库
+                entry.setTraceId(MDC.get("traceId")); // 幂等键：MQ 重放/重复消费时不重复落库
+                if (!deliveryService.send(operLogTopic, LogDeliveryService.TAG_OPER,
+                        objectMapper.writeValueAsString(entry))) {
+                    // 最后兜底：同步落库
                     operLogMapper.insert(entry);
                 }
             } catch (Exception e) {

@@ -47,6 +47,14 @@ ai:
     # 即时通知的最小严重级别（2警告 3严重）
     notify-severity: 3
 
+# 日志多级降级（RocketMQ → Redis Stream → 同步落库；Redis 需 ≥ 5.0）
+mq:
+  fallback:
+    # Redis Stream 缓冲 key
+    stream-key: japy:log:fallback-stream
+    # MQ 恢复探测间隔（毫秒）
+    probe-interval-ms: 60000
+
 # JWT（生产环境通过环境变量 JWT_SECRET 覆盖）
 jwt:
   secret: ${JWT_SECRET:japy-framework-secret-key-must-be-at-least-256-bits-long!!}

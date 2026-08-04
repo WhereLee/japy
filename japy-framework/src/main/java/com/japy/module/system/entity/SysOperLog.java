@@ -21,6 +21,8 @@ public class SysOperLog {
     private String jsonResult;
     private Integer status;          // 0成功 1失败
     private String errorMsg;
+    /** 链路追踪 ID：幂等键（V5 唯一索引），MQ 重放/重复消费时防重复落库 */
+    private String traceId;
     private Long costTime;
     private LocalDateTime operTime;
 }
