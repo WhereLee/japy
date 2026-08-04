@@ -129,9 +129,4 @@ public class LogDeliveryService {
     public boolean isMqHealthy() {
         return mqHealthy;
     }
-
-    /** 测试辅助：重置健康标记 */
-    public void setMqHealthy(boolean healthy) {
-        this.mqHealthy = healthy;
-    }
 }

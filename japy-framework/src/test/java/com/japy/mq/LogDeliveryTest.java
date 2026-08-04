@@ -14,6 +14,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,13 +54,13 @@ class LogDeliveryTest extends AbstractIntegrationTest {
     void cleanStream() {
         // 其他测试类的操作日志可能真实降级进 Stream（MQ 未运行时），每个用例前清理保证独立
         redisTemplate.delete(streamKey);
-        deliveryService.setMqHealthy(true);
+        ReflectionTestUtils.setField(deliveryService, "mqHealthy", true);
     }
 
     @AfterEach
     void cleanup() {
         redisTemplate.delete(streamKey);          // Redis 不走事务，手动清理
-        deliveryService.setMqHealthy(true);       // 重置健康标记
+        ReflectionTestUtils.setField(deliveryService, "mqHealthy", true); // 重置健康标记
     }
 
     @Test

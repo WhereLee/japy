@@ -3,7 +3,9 @@ package com.japy.aspect;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.japy.module.system.entity.SysOperLog;
 import com.japy.module.system.mapper.SysOperLogMapper;
+import com.japy.common.R;
 import com.japy.mq.LogDeliveryService;
+import com.japy.security.LoginUser;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +15,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.MDC;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -32,7 +35,7 @@ public class OperLogAspect {
     private final SysOperLogMapper operLogMapper;
     private final ObjectMapper objectMapper;
 
-    @org.springframework.beans.factory.annotation.Value("${rocketmq.topics.oper-log:japy_oper_log}")
+    @Value("${rocketmq.topics.oper-log:japy_oper_log}")
     private String operLogTopic;
 
     @Around("@annotation(operLog)")
@@ -42,7 +45,7 @@ public class OperLogAspect {
         Object result;
         try {
             result = pjp.proceed();
-            if (result instanceof com.japy.common.R<?> r && r.getCode() != 200) {
+            if (result instanceof R<?> r && r.getCode() != 200) {
                 error = r.getMsg();
             }
             return result;
@@ -74,7 +77,7 @@ public class OperLogAspect {
         entry.setCostTime(cost);
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        entry.setOperName(auth != null && auth.getPrincipal() instanceof com.japy.security.LoginUser lu
+        entry.setOperName(auth != null && auth.getPrincipal() instanceof LoginUser lu
                 ? lu.getUser().getNickname() : "anonymous");
 
         ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
