@@ -46,6 +46,12 @@ class AiMonitorTest extends AbstractIntegrationTest {
     @Autowired
     private SlowOpsMonitor slowOpsMonitor;
     @Autowired
+    private com.japy.module.ai.monitor.LockStormMonitor lockStormMonitor;
+    @Autowired
+    private com.japy.module.ai.monitor.ApiErrorSurgeMonitor apiErrorSurgeMonitor;
+    @Autowired
+    private com.japy.module.ai.monitor.ApiFailRateMonitor apiFailRateMonitor;
+    @Autowired
     private AiMonitorService monitorService;
     @Autowired
     private AiMonitorEventMapper eventMapper;
@@ -104,6 +110,69 @@ class AiMonitorTest extends AbstractIntegrationTest {
         slow.setCostTime(8000L); // 超过默认 5000ms 阈值
         operLogMapper.insert(slow);
         assertFalse(slowOpsMonitor.check().isEmpty(), "耗时 8s 应命中慢操作检测");
+    }
+
+    @Test
+    @Order(2)
+    void 锁定风暴检测() {
+        // 过去 7 天每天 1 条锁定（日均 1），今天 6 条 → 6 > 1*3 命中
+        for (int d = 1; d <= 7; d++) {
+            SysLoginLog lock = lockLogin("10.8.0." + d);
+            lock.setLoginTime(java.time.LocalDateTime.now().minusDays(d));
+            loginLogMapper.insert(lock);
+        }
+        for (int i = 0; i < 6; i++) {
+            loginLogMapper.insert(lockLogin("10.8.0." + i));
+        }
+        var events = lockStormMonitor.check();
+        assertFalse(events.isEmpty(), "今日锁定 6 次应命中锁定风暴");
+    }
+
+    @Test
+    @Order(2)
+    void 接口错误突增检测() {
+        // 近 24h 失败 30 条；近 7 天（3 天前）失败 10 条（日均 1.4）→ 30 > 1.4*3 且 >= 20 命中
+        for (int i = 0; i < 30; i++) {
+            operLogMapper.insert(failOper("/system/user"));
+        }
+        for (int i = 0; i < 10; i++) {
+            SysOperLog old = failOper("/system/user");
+            old.setOperTime(java.time.LocalDateTime.now().minusDays(3));
+            operLogMapper.insert(old);
+        }
+        var events = apiErrorSurgeMonitor.check();
+        assertTrue(events.stream().anyMatch(e -> e.getEvidence().get("url").equals("/system/user")),
+                "24h 失败 30 次应命中错误突增");
+    }
+
+    @Test
+    @Order(2)
+    void 接口失败率检测() {
+        // 50 条中 5 条失败 → 10% > 3% 且样本 >= 50 命中
+        for (int i = 0; i < 45; i++) {
+            SysOperLog ok = new SysOperLog();
+            ok.setOperUrl("/system/user");
+            ok.setRequestMethod("GET");
+            ok.setStatus(0);
+            operLogMapper.insert(ok);
+        }
+        for (int i = 0; i < 5; i++) {
+            operLogMapper.insert(failOper("/system/user"));
+        }
+        var events = apiFailRateMonitor.check();
+        assertTrue(events.stream().anyMatch(e -> e.getEvidence().get("url").equals("/system/user")),
+                "失败率 10% 应命中失败率检测");
+    }
+
+    @Test
+    @Order(3)
+    void AI接口权限校验() throws Exception {
+        // 普通用户访问 /ai/** → 403
+        JsonNode reg = postJson("/auth/register",
+                Map.of("username", "t_ai_perm_" + nextTs(), "password", "123456", "nickname", "普通用户"), null);
+        String userToken = reg.get("data").get("accessToken").asText();
+        JsonNode denied = getJson("/ai/report", userToken);
+        assertEquals(403, denied.get("code").asInt(), denied.toString());
     }
 
     // ---------- 全链路（落库） ----------
@@ -173,6 +242,15 @@ class AiMonitorTest extends AbstractIntegrationTest {
         }
         JsonNode rejected = getJson("/ai/suggestions?page=1&size=10&status=2", admin);
         assertEquals(200, rejected.get("code").asInt());
+
+        // 已批准的建议卡可标记执行 → 状态 3
+        JsonNode approved = getJson("/ai/suggestions?page=1&size=1&status=1", admin);
+        if (approved.get("data").get("records").size() > 0) {
+            long id3 = approved.get("data").get("records").get(0).get("id").asLong();
+            assertEquals(200, postJson("/ai/suggestions/" + id3 + "/execute", Map.of(), admin).get("code").asInt());
+        }
+        JsonNode executed = getJson("/ai/suggestions?page=1&size=10&status=3", admin);
+        assertEquals(200, executed.get("code").asInt());
     }
 
     // ---------- 反馈闭环 ----------
@@ -257,6 +335,26 @@ class AiMonitorTest extends AbstractIntegrationTest {
         log.setIpaddr(ip);
         log.setStatus(1);
         log.setMsg("密码错误");
+        return log;
+    }
+
+    /** 锁定记录（msg 含"锁定"） */
+    private SysLoginLog lockLogin(String ip) {
+        SysLoginLog log = new SysLoginLog();
+        log.setUsername("t_lock_" + nextTs());
+        log.setIpaddr(ip);
+        log.setStatus(1);
+        log.setMsg("密码错误次数过多，账号已锁定");
+        return log;
+    }
+
+    /** 失败操作日志 */
+    private SysOperLog failOper(String url) {
+        SysOperLog log = new SysOperLog();
+        log.setOperUrl(url);
+        log.setRequestMethod("GET");
+        log.setStatus(1);
+        log.setErrorMsg("测试失败");
         return log;
     }
 }
