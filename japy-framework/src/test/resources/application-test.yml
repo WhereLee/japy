@@ -5,3 +5,7 @@ spring:
     url: jdbc:postgresql://localhost:5432/japy_moments_test
     username: postgres
     password: root
+
+# 小说文件落盘到 target 下（随构建清理，不污染开发 data/）
+novel:
+  storage-dir: target/test-data/novels

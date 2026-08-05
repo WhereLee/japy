@@ -1,6 +1,9 @@
 server:
   port: 8085
 
+novel:
+  storage-dir: data/novels
+
 spring:
   application:
     name: japy-framework
