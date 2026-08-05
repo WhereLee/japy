@@ -1,9 +1,13 @@
-# 前端构建产物
+# 前端构建产物/依赖
 japy-admin/dist/
 japy-admin/node_modules/
+japy-web/dist/
+japy-web/node_modules/
 # vue-tsc -b 生成物
 japy-admin/vite.config.js
 japy-admin/vite.config.d.ts
+japy-web/vite.config.js
+japy-web/vite.config.d.ts
 # 日志/临时
 *.log
 _boot.log
