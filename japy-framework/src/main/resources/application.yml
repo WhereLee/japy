@@ -7,9 +7,10 @@ novel:
 spring:
   application:
     name: japy-framework
-  profiles:
-    # 本地开发默认加载 application-local.yml（含密钥，不入库）；测试用 @ActiveProfiles("test") 覆盖
-    default: local
+  dotenv:
+    # 读取项目根目录 .env（spring-boot:run 工作目录为模块根，.. 指向仓库根）；找不到不报错
+    location: file:../.env
+    fail-if-missing: false
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/japy_moments
@@ -38,7 +39,7 @@ rocketmq:
 # AI 运维分析顾问（Monitor Agent）
 ai:
   llm:
-    # API key：本地走 application-local.yml，生产走环境变量 DEEPSEEK_API_KEY，绝不写死入库
+    # API key：从根目录 .env 的 DEEPSEEK_API_KEY 注入（spring-dotenv 加载），生产环境变量同名
     api-key: ${DEEPSEEK_API_KEY:}
     # base-url/model 默认与 sys_config 一致，可用参数管理覆盖
     base-url: https://api.deepseek.com/v1
