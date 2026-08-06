@@ -25,7 +25,8 @@ RERANKER_PATH = PROJECT_ROOT / "models" / "bge-reranker-v2-m3"
 LOG_DIR = PROJECT_ROOT / "logs"
 
 # === LLM 配置（密钥来自 .env，未配置则为空 → 调用方自行降级）===
-LLM_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+# rag 优先用独立 RAG_API_KEY（未泄露原 key），无则回退 DEEPSEEK_API_KEY
+LLM_API_KEY = os.getenv("RAG_API_KEY", "") or os.getenv("DEEPSEEK_API_KEY", "")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-v4-flash")
 LLM_TIMEOUT = 120            # API 超时（秒）

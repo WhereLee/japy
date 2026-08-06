@@ -7,10 +7,6 @@ novel:
 spring:
   application:
     name: japy-framework
-  dotenv:
-    # 读取项目根目录 .env（spring-boot:run 工作目录为模块根，.. 指向仓库根）；找不到不报错
-    location: file:../.env
-    fail-if-missing: false
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/japy_moments
