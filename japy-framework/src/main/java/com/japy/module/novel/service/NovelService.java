@@ -15,6 +15,7 @@ import com.japy.module.novel.mapper.NovelReadProgressMapper;
 import com.japy.module.novel.vo.ChapterVO;
 import com.japy.module.novel.vo.NovelVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -168,6 +169,7 @@ public class NovelService {
 
     private final NovelParserService parserService;
     private final com.japy.module.audit.service.AuditService auditService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 上传并入库：解析 → 落盘 → 写三表 → 自动上架 */
     @Transactional
@@ -235,6 +237,9 @@ public class NovelService {
 
         // 5. 内容扫描留痕（audit 域：无命中 PASS，有命中 PENDING，小说保持上架）
         auditService.scanAndRecord(novel.getId(), novel.getTitle(), novel.getIntro(), "UPLOAD");
+
+        // 6. 触发 RAG 索引同步（异步事件，不阻塞上传）
+        eventPublisher.publishEvent(new com.japy.module.rag.event.NovelUploadedEvent(novel.getId()));
         return toVO(novel);
     }
 

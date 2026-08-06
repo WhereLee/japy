@@ -40,6 +40,7 @@ CHUNK_OVERLAP = 100          # 相邻块重叠字数
 TOP_K = 12                   # 最终返回的chunk数量（给 LLM 更多片段）
 VECTOR_TOP_K = 24            # 向量检索候选数
 BM25_TOP_K = 24              # BM25检索候选数
+RRF_K = 60                    # RRF 融合常数
 
 # === 日志配置 ===
 def setup_logging():

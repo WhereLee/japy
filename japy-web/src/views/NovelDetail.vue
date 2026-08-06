@@ -19,9 +19,33 @@
           <p class="intro">{{ novel.intro }}</p>
           <div class="actions">
             <el-button type="primary" size="large" @click="continueRead">📖 {{ progress ? '继续阅读' : '开始阅读' }}</el-button>
+            <el-button size="large" type="warning" plain @click="askDialog = true">🤖 AI 问这本书</el-button>
           </div>
         </div>
       </div>
+
+      <!-- AI 问答对话框 -->
+      <el-dialog v-model="askDialog" :title="`AI 问这本书 - ${novel?.title}`" width="560px" :close-on-click-modal="false">
+        <div v-loading="asking" class="ask-body">
+          <el-input v-model="askQuestion" type="textarea" :rows="2" placeholder="例如：晨星号收到了什么信号？" @keyup.ctrl.enter="doAsk" />
+          <div class="ask-actions">
+            <el-button type="primary" :loading="asking" @click="doAsk">提问</el-button>
+          </div>
+          <template v-if="askAnswer">
+            <div class="ask-answer">{{ askAnswer.answer }}</div>
+            <div class="ask-sources" v-if="askAnswer.sources?.length">
+              <div class="sources-title">引用片段（{{ askAnswer.sources.length }}）</div>
+              <div v-for="(s, i) in askAnswer.sources.slice(0, 5)" :key="i" class="source-item">
+                <span class="source-ch">第{{ s.chapter_no }}章</span>
+                <span class="source-text">{{ s.content_preview }}</span>
+              </div>
+            </div>
+          </template>
+        </div>
+        <template #footer>
+          <el-button @click="askDialog = false">关闭</el-button>
+        </template>
+      </el-dialog>
 
       <!-- 目录 -->
       <h2 class="section-title">目录（{{ chapterTotal }} 章）</h2>
@@ -46,8 +70,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { novelDetail, listChapters, getProgress } from '@/api/novel'
+import { ragAsk } from '@/api/rag'
 import type { Novel, Chapter } from '@/api/novel'
+import type { RagAnswer } from '@/api/rag'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +88,27 @@ const chapterSize = ref(30)
 const progress = ref<any>(null)
 const loading = ref(false)
 const chapterLoading = ref(false)
+
+// AI 问答
+const askDialog = ref(false)
+const asking = ref(false)
+const askQuestion = ref('')
+const askAnswer = ref<RagAnswer | null>(null)
+
+async function doAsk() {
+  if (!askQuestion.value.trim()) {
+    ElMessage.warning('请输入问题')
+    return
+  }
+  asking.value = true
+  try {
+    askAnswer.value = await ragAsk(novelId, askQuestion.value.trim())
+  } catch (e: any) {
+    ElMessage.error(e?.message || 'AI 服务暂时不可用')
+  } finally {
+    asking.value = false
+  }
+}
 
 async function loadChapters() {
   chapterLoading.value = true
@@ -150,4 +198,32 @@ onMounted(async () => {
 .ch-title { flex: 1; font-size: 14px; color: #334155; }
 .ch-chars { font-size: 12px; color: #94a3b8; }
 .pager { display: flex; justify-content: center; padding: 12px 0; }
+.ask-body { display: flex; flex-direction: column; gap: 10px; }
+.ask-actions { display: flex; justify-content: flex-end; }
+.ask-answer {
+  background: #f8fafc;
+  border-left: 3px solid #f59e0b;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.ask-sources { margin-top: 6px; }
+.sources-title { font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 6px; }
+.source-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #475569;
+}
+.source-ch { flex-shrink: 0; color: #f59e0b; font-weight: 600; }
+.source-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

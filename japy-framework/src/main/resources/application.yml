@@ -4,6 +4,9 @@ server:
 novel:
   storage-dir: data/novels
 
+rag:
+  service-url: http://127.0.0.1:8000
+
 spring:
   application:
     name: japy-framework
