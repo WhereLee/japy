@@ -11,7 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 小说管理接口（管理端）：上传 / 列表 / 状态流转 / 删除。
- * 生命周期：草稿(2) → 上传完成自动连载(0) → 完结(1) / 下架(3) / 删除(逻辑)。
+ * 生命周期：草稿(2) → 上传完成自动上架(0) → 下架(1) / 删除(逻辑)。
  */
 @RestController
 @RequestMapping("/admin/novel")
@@ -41,7 +41,7 @@ public class AdminNovelController {
         return R.ok(novelService.adminList(page, size, keyword));
     }
 
-    /** 状态流转：0连载 1完结 2草稿 3下架 */
+    /** 状态流转：0上架 1下架 2草稿 */
     @PutMapping("/{id}/status")
     @PreAuthorize("@ss.hasPermi('novel:status')")
     @com.japy.aspect.OperLog(title = "小说管理", businessType = 2)

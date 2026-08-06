@@ -73,7 +73,7 @@ class NovelLifecycleTest extends AbstractIntegrationTest {
     @Order(2)
     void 状态流转() throws Exception {
         // 用 seed 小说 id=1
-        JsonNode r = call(put("/admin/novel/1/status?status=3")
+        JsonNode r = call(put("/admin/novel/1/status?status=1")
                 .header("Authorization", "Bearer " + token));
         assertEquals(200, r.get("code").asInt());
 
@@ -81,20 +81,19 @@ class NovelLifecycleTest extends AbstractIntegrationTest {
         JsonNode detail = call(get("/novel/1").header("Authorization", "Bearer " + token));
         assertEquals(400, detail.get("code").asInt(), "下架小说用户端不可见");
 
-        // 恢复连载
+        // 恢复上架
         call(put("/admin/novel/1/status?status=0").header("Authorization", "Bearer " + token));
         JsonNode detail2 = call(get("/novel/1").header("Authorization", "Bearer " + token));
-        assertEquals(200, detail2.get("code").asInt(), "恢复连载后可见");
+        assertEquals(200, detail2.get("code").asInt(), "恢复上架后可见");
     }
 
     @Test
     @Order(3)
-    void 完结状态() throws Exception {
-        JsonNode r = call(put("/admin/novel/1/status?status=1")
+    void 非法状态拒绝() throws Exception {
+        // 状态只有 0/1/2，传入旧值 3 应被拒绝
+        JsonNode r = call(put("/admin/novel/1/status?status=3")
                 .header("Authorization", "Bearer " + token));
-        assertEquals(200, r.get("code").asInt());
-        JsonNode detail = call(get("/novel/1").header("Authorization", "Bearer " + token));
-        assertEquals(200, detail.get("code").asInt(), "完结小说用户端可见");
+        assertEquals(400, r.get("code").asInt(), "非法状态应拒绝");
     }
 
     @Test

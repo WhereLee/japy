@@ -38,11 +38,11 @@ public class NovelService {
     private final NovelParagraphMapper paragraphMapper;
     private final NovelReadProgressMapper progressMapper;
 
-    /** 小说列表（分页 + 可选关键词/分类）——用户端：仅连载(0)/完结(1)，未删除 */
+    /** 小说列表（分页 + 可选关键词/分类）——用户端：仅上架(0)，未删除 */
     public PageResult<NovelVO> listNovels(int page, int size, String keyword, String category) {
         Page<Novel> p = novelMapper.selectPage(new Page<>(page, size),
                 new LambdaQueryWrapper<Novel>()
-                        .in(Novel::getStatus, 0, 1)
+                        .eq(Novel::getStatus, 0)
                         .and(keyword != null && !keyword.isBlank(), w -> w
                                 .like(Novel::getTitle, keyword).or().like(Novel::getAuthor, keyword))
                         .eq(category != null && !category.isBlank(), Novel::getCategory, category)
@@ -61,11 +61,10 @@ public class NovelService {
         return PageResult.of(p.getRecords().stream().map(this::toVO).toList(), p.getTotal(), page, size);
     }
 
-    /** 小说详情——校验可读状态（连载/完结） */
+    /** 小说详情——校验可读状态（仅上架） */
     public NovelVO detail(Long novelId) {
         Novel novel = novelMapper.selectById(novelId);
-        if (novel == null || novel.getStatus() == null
-                || (novel.getStatus() != 0 && novel.getStatus() != 1)) {
+        if (novel == null || novel.getStatus() == null || novel.getStatus() != 0) {
             throw new BusinessException("小说不存在或未上架");
         }
         return toVO(novel);
@@ -169,7 +168,7 @@ public class NovelService {
 
     private final NovelParserService parserService;
 
-    /** 上传并入库：解析 → 落盘 → 写三表 → 自动上架（连载） */
+    /** 上传并入库：解析 → 落盘 → 写三表 → 自动上架 */
     @Transactional
     public NovelVO upload(String title, String author, String category, String intro,
                           org.springframework.web.multipart.MultipartFile file) {
@@ -196,8 +195,7 @@ public class NovelService {
         novel.setCategory(category == null || category.isBlank() ? "其他" : category.trim());
         novel.setIntro(intro);
         novel.setStatus(2);          // 草稿：解析落盘中
-        novel.setChapterCount(parsed.getChapters().size());
-        novel.setTotalChars(parsed.getTotalChars());
+        novel.setChapterCount(parsed.getChapters().size());        novel.setTotalChars(parsed.getTotalChars());
         novel.setDelFlag(0);
         novelMapper.insert(novel);
 
@@ -236,9 +234,9 @@ public class NovelService {
         return toVO(novel);
     }
 
-    /** 状态流转（0连载 1完结 3下架 2草稿） */
+    /** 状态流转（0上架 1下架 2草稿） */
     public void changeStatus(Long novelId, int target) {
-        if (target != 0 && target != 1 && target != 2 && target != 3) {
+        if (target != 0 && target != 1 && target != 2) {
             throw new BusinessException("非法状态");
         }
         Novel novel = novelMapper.selectById(novelId);

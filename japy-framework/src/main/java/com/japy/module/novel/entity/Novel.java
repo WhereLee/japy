@@ -19,7 +19,7 @@ public class Novel {
     private String intro;
     private String cover;
     private String category;
-    private Integer status;          // 0连载 1完结 2草稿 3下架
+    private Integer status;          // 0上架(可读) 1下架 2草稿
     private Integer chapterCount;    // 冗余：章节数
     private Long totalChars;         // 冗余：总字数
     private String filePath;         // 源文件目录（data/novels/{id}_{title}）

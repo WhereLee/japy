@@ -35,14 +35,13 @@
           <el-tag :type="statusType(row.status)" size="small">{{ statusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="230" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <template v-if="row.status === 3 || row.status === 2">
+          <template v-if="row.status !== 0">
             <el-button link type="success" size="small" v-perm="'novel:status'" @click="onStatus(row, 0)">上架</el-button>
           </template>
           <template v-else>
-            <el-button link type="warning" size="small" v-perm="'novel:status'" @click="onStatus(row, 3)">下架</el-button>
-            <el-button v-if="row.status !== 1" link type="primary" size="small" v-perm="'novel:status'" @click="onStatus(row, 1)">完结</el-button>
+            <el-button link type="warning" size="small" v-perm="'novel:status'" @click="onStatus(row, 1)">下架</el-button>
           </template>
           <el-button link type="danger" size="small" v-perm="'novel:delete'" @click="onDelete(row)">删除</el-button>
         </template>
@@ -100,10 +99,9 @@ const fileRef = ref<HTMLInputElement>()
 const form = reactive({ title: '', author: '', category: '', intro: '' })
 
 const statusMap: Record<number, [string, string]> = {
-  0: ['连载', 'success'],
-  1: ['完结', 'primary'],
-  2: ['草稿', 'info'],
-  3: ['已下架', 'warning']
+  0: ['上架', 'success'],
+  1: ['下架', 'warning'],
+  2: ['草稿', 'info']
 }
 function statusText(s: number) { return statusMap[s]?.[0] ?? '未知' }
 function statusType(s: number) { return statusMap[s]?.[1] ?? 'info' as any }
@@ -162,7 +160,7 @@ async function onUpload() {
 }
 
 async function onStatus(row: any, status: number) {
-  const action = { 0: '上架', 1: '标记完结', 3: '下架' }[status]
+  const action = { 0: '上架', 1: '下架' }[status]
   await ElMessageBox.confirm(`确定${action}《${row.title}》？`, '提示', { type: 'info' })
   await changeNovelStatus(row.id, status)
   ElMessage.success('已' + action)

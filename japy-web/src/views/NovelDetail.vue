@@ -13,7 +13,6 @@
           <h1>{{ novel.title }}</h1>
           <div class="meta-line">
             <el-tag size="small" type="info">{{ novel.category }}</el-tag>
-            <el-tag size="small" :type="novel.status === 0 ? 'success' : 'warning'">{{ novel.status === 0 ? '连载' : '完结' }}</el-tag>
             <span class="meta-text">{{ novel.author }}</span>
             <span class="meta-text">{{ novel.chapterCount }} 章 · {{ (novel.totalChars / 1000).toFixed(1) }}k 字</span>
           </div>
