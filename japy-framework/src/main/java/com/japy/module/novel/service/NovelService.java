@@ -167,6 +167,7 @@ public class NovelService {
     // ==================== 管理端：生命周期操作 ====================
 
     private final NovelParserService parserService;
+    private final com.japy.module.audit.service.AuditService auditService;
 
     /** 上传并入库：解析 → 落盘 → 写三表 → 自动上架 */
     @Transactional
@@ -231,6 +232,9 @@ public class NovelService {
         // 4. 自动上架
         novel.setStatus(0);
         novelMapper.updateById(novel);
+
+        // 5. 内容扫描留痕（audit 域：无命中 PASS，有命中 PENDING，小说保持上架）
+        auditService.scanAndRecord(novel.getId(), novel.getTitle(), novel.getIntro(), "UPLOAD");
         return toVO(novel);
     }
 
