@@ -39,30 +39,35 @@ export const usePermissionStore = defineStore('permission', {
 })
 
 /** 后端 RouterVo → 前端路由对象 */
-function convert(list: RouterItem[]): any[] {
+function convert(list: RouterItem[], isTop: boolean = true): any[] {
   return list.map((item) => {
-    const children = item.children && item.children.length ? convert(item.children) : []
+    const children = item.children && item.children.length ? convert(item.children, false) : []
     const route: any = {
       path: item.path,
       name: item.name,
       meta: { title: item.meta?.title, icon: item.meta?.icon }
     }
-    const comp = loadView(item.component)
     if (item.component === 'Layout' && children.length) {
-      route.component = comp
+      // 目录：Layout 包裹子路由
+      route.component = Layout
       route.redirect = item.redirect || join(item.path, children[0]?.path)
       route.children = children
     } else if (children.length) {
+      // 有子节点的非 Layout（兜底）：同样包 Layout
       route.component = Layout
       route.redirect = item.redirect || join(item.path, children[0]?.path)
-      route.children = children.map((c: any) => ({ ...c, path: c.path }))
-    } else if (comp && comp !== Layout) {
-      // 单页顶级菜单：包 Layout 保证侧边栏存在（若依模式）
-      route.component = Layout
-      route.redirect = item.redirect
-      route.children = [{ path: '', component: comp, meta: route.meta }]
+      route.children = children
     } else {
-      route.component = comp || Layout
+      const comp = loadView(item.component)
+      if (isTop && comp && comp !== Layout) {
+        // 顶级叶子菜单：包 Layout 保证侧边栏存在（若依模式）
+        route.component = Layout
+        route.redirect = item.redirect
+        route.children = [{ path: '', component: comp, meta: route.meta }]
+      } else {
+        // 子级叶子：直接用页面组件（父级目录已包 Layout，避免双层嵌套）
+        route.component = comp || Layout
+      }
     }
     return route
   })
