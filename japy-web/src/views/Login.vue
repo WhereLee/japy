@@ -1,7 +1,8 @@
 <template>
   <div class="login-page">
     <div class="login-card">
-      <h1>Japy 阅读</h1>
+      <div class="seal">阅</div>
+      <h1 class="serif">Japy · 阅</h1>
       <p class="sub">登录后开始阅读</p>
       <el-form :model="form" size="large" @keyup.enter="onLogin">
         <el-form-item>
@@ -10,9 +11,9 @@
         <el-form-item>
           <el-input v-model="form.password" type="password" placeholder="密码" show-password />
         </el-form-item>
-        <el-button type="primary" class="btn" :loading="loading" @click="onLogin">登录</el-button>
+        <el-button type="primary" class="btn" :loading="loading" @click="onLogin">登 录</el-button>
       </el-form>
-      <p class="hint">演示账号：demo / 123456</p>
+      <p class="hint">演示账号：admin / admin123</p>
     </div>
   </div>
 </template>
@@ -53,17 +54,37 @@ async function onLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1e293b, #0f172a);
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(179, 71, 45, .06), transparent 60%),
+    radial-gradient(ellipse at 70% 80%, rgba(61, 90, 76, .08), transparent 60%),
+    var(--paper);
 }
 .login-card {
   width: 360px;
-  background: #fff;
+  background: #fffdf7;
+  border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 36px 32px 24px;
+  padding: 40px 36px 28px;
   text-align: center;
+  box-shadow: 0 12px 40px rgba(45, 42, 38, .08);
 }
-h1 { margin: 0 0 6px; font-size: 22px; color: #0f172a; }
-.sub { margin: 0 0 24px; font-size: 13px; color: #94a3b8; }
-.btn { width: 100%; }
-.hint { margin-top: 16px; font-size: 12px; color: #94a3b8; }
+.seal {
+  width: 52px; height: 52px;
+  margin: 0 auto 14px;
+  background: var(--cinnabar);
+  color: #f5efe2;
+  border-radius: 8px;
+  font-size: 26px;
+  font-family: var(--serif);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 2px rgba(245,239,226,.35);
+}
+h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: 3px; }
+.sub { margin: 0 0 26px; font-size: 13px; color: var(--ink-faint); }
+.btn {
+  width: 100%;
+  background: var(--ink); border-color: var(--ink);
+}
+.btn:hover { background: var(--cinnabar); border-color: var(--cinnabar); }
+.hint { margin-top: 18px; font-size: 12px; color: var(--ink-faint); }
 </style>

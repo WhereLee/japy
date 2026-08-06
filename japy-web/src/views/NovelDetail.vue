@@ -8,7 +8,7 @@
     <div v-if="novel" class="content">
       <!-- 头部信息 -->
       <div class="hero">
-        <div class="cover" :style="{ background: '#6366f1' }">{{ novel.title.slice(0, 4) }}</div>
+        <div class="cover" :style="{ background: coverGradient() }">{{ novel.title.slice(0, 4) }}</div>
         <div class="hero-info">
           <h1>{{ novel.title }}</h1>
           <div class="meta-line">
@@ -18,8 +18,8 @@
           </div>
           <p class="intro">{{ novel.intro }}</p>
           <div class="actions">
-            <el-button type="primary" size="large" @click="continueRead">📖 {{ progress ? '继续阅读' : '开始阅读' }}</el-button>
-            <el-button size="large" type="warning" plain @click="askDialog = true">🤖 AI 问这本书</el-button>
+            <el-button type="primary" size="large" @click="continueRead">{{ progress ? '继续阅读' : '开始阅读' }}</el-button>
+            <el-button size="large" plain class="ask-btn" @click="askDialog = true">AI 问这本书</el-button>
           </div>
         </div>
       </div>
@@ -133,6 +133,19 @@ function read(chapterId: number) {
   router.push(`/reader/${chapterId}?novel=${novelId}`)
 }
 
+// 封面配色与 Home 一致（暖色五音）
+const TONES = [
+  ['#3d5a4c', '#2c4438'],
+  ['#b3472d', '#93351f'],
+  ['#3a4a6b', '#2b3850'],
+  ['#8a6a3b', '#6f542e'],
+  ['#5a6a72', '#46545c']
+]
+function coverGradient() {
+  const [a, c] = TONES[novelId % TONES.length]
+  return `linear-gradient(150deg, ${a} 0%, ${c} 100%)`
+}
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -148,25 +161,25 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.detail { min-height: 100vh; background: #f8fafc; }
+.detail { min-height: 100vh; background: var(--paper); }
 .topbar {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 24px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  background: #fffdf7;
+  border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
   z-index: 10;
 }
-.topbar-title { font-weight: 600; color: #0f172a; }
+.topbar-title { font-weight: 600; font-family: var(--serif); color: var(--ink); }
 .content { max-width: 860px; margin: 0 auto; padding: 24px 20px 48px; }
-.hero { display: flex; gap: 24px; background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 1px 3px rgba(15,23,42,0.06); }
+.hero { display: flex; gap: 24px; background: #fffdf7; border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
 .cover {
   width: 120px;
   height: 160px;
-  border-radius: 10px;
+  border-radius: 4px 10px 10px 4px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -176,12 +189,12 @@ onMounted(async () => {
   font-weight: 700;
   letter-spacing: 2px;
 }
-.hero-info h1 { margin: 0 0 10px; font-size: 24px; color: #0f172a; }
+.hero-info h1 { margin: 0 0 10px; font-size: 26px; font-family: var(--serif); color: var(--ink); }
 .meta-line { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .meta-text { font-size: 13px; color: #64748b; }
 .intro { font-size: 14px; color: #475569; line-height: 1.8; margin: 0 0 18px; }
 .section-title { font-size: 18px; margin: 28px 0 12px; color: #0f172a; }
-.chapter-list { background: #fff; border-radius: 12px; padding: 8px 16px; box-shadow: 0 1px 3px rgba(15,23,42,0.06); min-height: 80px; }
+.chapter-list { background: #fffdf7; border: 1px solid var(--line); border-radius: 12px; padding: 8px 16px; min-height: 80px; }
 .chapter-item {
   display: flex;
   align-items: center;
@@ -191,12 +204,12 @@ onMounted(async () => {
   cursor: pointer;
   transition: background 0.12s;
 }
-.chapter-item:hover { background: #f8fafc; }
-.chapter-item.current { background: #eef2ff; }
-.chapter-item.current .ch-title { color: #4f46e5; font-weight: 600; }
-.ch-no { width: 28px; height: 28px; border-radius: 6px; background: #f1f5f9; color: #64748b; font-size: 12px; display: flex; align-items: center; justify-content: center; }
-.ch-title { flex: 1; font-size: 14px; color: #334155; }
-.ch-chars { font-size: 12px; color: #94a3b8; }
+.chapter-item:hover { background: var(--paper); }
+.chapter-item.current { background: rgba(179,71,45,.06); }
+.chapter-item.current .ch-title { color: var(--cinnabar); font-weight: 600; }
+.ch-no { width: 28px; height: 28px; border-radius: 6px; background: var(--paper-deep); color: var(--ink-faint); font-size: 12px; display: flex; align-items: center; justify-content: center; font-family: var(--serif); }
+.ch-title { flex: 1; font-size: 14px; color: var(--ink-soft); font-family: var(--serif); }
+.ch-chars { font-size: 12px; color: var(--ink-faint); }
 .pager { display: flex; justify-content: center; padding: 12px 0; }
 .ask-body { display: flex; flex-direction: column; gap: 10px; }
 .ask-actions { display: flex; justify-content: flex-end; }

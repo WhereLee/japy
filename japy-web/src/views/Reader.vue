@@ -2,10 +2,10 @@
   <div class="reader" :class="'theme-' + theme">
     <!-- 顶栏 -->
     <header class="bar top" :class="{ show: controlsVisible }">
-      <el-button text @click="$router.push('/novel/' + novelId)">←</el-button>
+      <el-button text @click="$router.push('/novel/' + novelId)">‹ 书库</el-button>
       <span class="bar-title">{{ chapter?.title }}</span>
       <span class="bar-spacer" />
-      <el-button text @click="controlsVisible = !controlsVisible">⚙</el-button>
+      <el-button text @click="controlsVisible = !controlsVisible">设置</el-button>
     </header>
 
     <!-- 正文 -->
@@ -44,7 +44,7 @@
     </el-drawer>
 
     <!-- 悬浮目录按钮 -->
-    <button class="fab" @click="showCatalog = true" v-show="!controlsVisible">☰</button>
+    <button class="fab" @click="showCatalog = true" v-show="!controlsVisible">目</button>
   </div>
 </template>
 
@@ -181,9 +181,9 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .reader { height: 100vh; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-.theme-white { background: #fff; color: #1f2937; }
-.theme-sepia { background: #f5ecd9; color: #4a3f2f; }
-.theme-dark { background: #1a1a1a; color: #b8b8b8; }
+.theme-white { background: #fffdf7; color: var(--ink); }
+.theme-sepia { background: var(--paper); color: var(--ink); }
+.theme-dark { background: #1f1d1a; color: #bfb8ad; }
 
 .bar {
   position: absolute;
@@ -194,7 +194,7 @@ onBeforeUnmount(() => {
   padding: 8px 16px;
   z-index: 20;
   transition: transform 0.25s;
-  background: rgba(255,255,255,0.95);
+  background: rgba(255,253,247,0.95);
   backdrop-filter: blur(6px);
 }
 .theme-dark .bar { background: rgba(30,30,30,0.95); }
@@ -211,10 +211,10 @@ onBeforeUnmount(() => {
   width: 22px; height: 22px; border-radius: 50%;
   border: 2px solid transparent; cursor: pointer;
 }
-.theme-dot.white { background: #fff; border-color: #cbd5e1; }
-.theme-dot.sepia { background: #f5ecd9; border-color: #d6c9a8; }
+.theme-dot.white { background: #fffdf7; border-color: var(--line); }
+.theme-dot.sepia { background: var(--paper); border-color: var(--line); }
 .theme-dot.dark { background: #1a1a1a; border-color: #444; }
-.theme-dot.active { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.3); }
+.theme-dot.active { border-color: var(--cinnabar); box-shadow: 0 0 0 2px rgba(79,70,229,0.3); }
 
 .content {
   flex: 1;
@@ -223,7 +223,7 @@ onBeforeUnmount(() => {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
-.ch-title { font-size: 24px; font-weight: 700; text-align: center; margin: 0 0 28px; }
+.ch-title { font-size: 26px; font-weight: 600; font-family: var(--serif); text-align: center; margin: 0 0 30px; letter-spacing: 2px; }
 .para {
   margin: 0 0 18px;
   text-indent: 2em;
@@ -241,18 +241,19 @@ onBeforeUnmount(() => {
 .end-tip { font-size: 13px; color: #94a3b8; }
 
 .fab {
+  font-family: var(--serif);
   position: fixed;
   right: 18px;
   bottom: 80px;
   width: 42px; height: 42px;
   border-radius: 50%;
   border: none;
-  background: rgba(79,70,229,0.9);
+  background: rgba(179,71,45,0.92);
   color: #fff;
   font-size: 18px;
   cursor: pointer;
   z-index: 15;
-  box-shadow: 0 4px 12px rgba(79,70,229,0.35);
+  box-shadow: 0 4px 12px rgba(179,71,45,0.35);
 }
 .catalog-list { display: flex; flex-direction: column; }
 .catalog-item {
