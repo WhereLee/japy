@@ -48,13 +48,17 @@ def sync(body: dict = None):
     body = body or {}
     novel_id = body.get("novel_id")
     if novel_id:
+        # 同书同步互斥（锁用完即清，避免无限增长）
         lock = _sync_locks.setdefault(novel_id, threading.Lock())
-        with lock:
-            try:
-                result = sync_novel(int(novel_id))
-            except Exception as e:
-                logger.exception("sync failed")
-                raise HTTPException(status_code=500, detail=f"同步失败: {e}")
+        try:
+            with lock:
+                try:
+                    result = sync_novel(int(novel_id))
+                except Exception as e:
+                    logger.exception("sync failed")
+                    raise HTTPException(status_code=500, detail=f"同步失败: {e}")
+        finally:
+            _sync_locks.pop(novel_id, None)
         _invalidate(int(novel_id))
         return {"code": 200, "data": result}
     # 全量
@@ -70,6 +74,8 @@ def ask(body: dict):
     question = (body.get("question") or "").strip()
     if not novel_id or not question:
         raise HTTPException(status_code=400, detail="novel_id 与 question 必填")
+    if len(question) > 500:
+        raise HTTPException(status_code=400, detail="问题过长（≤500 字）")
     if not pg_store.has_index(int(novel_id)):
         raise HTTPException(status_code=409,
                             detail="该书索引尚未构建，请先在管理端同步")

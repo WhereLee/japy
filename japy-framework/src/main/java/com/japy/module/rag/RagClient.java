@@ -8,6 +8,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -17,16 +18,24 @@ import java.util.Map;
 /**
  * RAG 服务客户端：HTTP 调用 Python rag 服务（:8000）。
  * 降级：Python 未启动/超时 → 抛 RagUnavailableException，业务层处理为友好提示。
+ * 超时策略：连接 3s（服务不可达快速失败），读取 60s（检索+生成约 11-20s，留足余量）。
  */
 @Slf4j
 @Component
 public class RagClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper om = new ObjectMapper();
 
     @Value("${rag.service-url:http://127.0.0.1:8000}")
     private String baseUrl;
+
+    public RagClient() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3_000);   // 连不上快速失败，不拖住业务线程
+        factory.setReadTimeout(60_000);     // 检索+生成耗时，留足余量
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     /** 是否可达（探活） */
     public boolean available() {

@@ -22,6 +22,11 @@ from dict_builder import load_dict
 
 RERANKER_ONNX_INT8_PATH = NOVELS_RAW_DIR.parent / "models" / "bge-reranker-v2-m3-onnx-int8"
 
+# Reranker 并发控制（全局信号量，最多同时 1 个 Rerank 操作）
+# bge-reranker int8 单实例 ~569MB，并发推理会内存暴涨/OOM（与旧 retriever.py 一致）
+_rerank_semaphore = threading.Semaphore(1)
+RERANK_TIMEOUT = 15  # 等待信号量超时（秒）
+
 logger = logging.getLogger("rag.retriever_pg")
 
 
@@ -112,9 +117,14 @@ class HybridRetriever:
         return results
 
     def _rerank(self, query: str, candidates: List[Dict], top_k: int = TOP_K) -> List[Dict]:
-        """Rerank 精排（bge-reranker ONNX INT8，tokenizer → 模型 → logits[:,0]）"""
+        """Rerank 精排（bge-reranker ONNX INT8，tokenizer → 模型 → logits[:,0]）
+        全局信号量限流：同时最多 1 个 Rerank 操作，超时降级 RRF 序"""
         if not candidates:
             return []
+        acquired = _rerank_semaphore.acquire(timeout=RERANK_TIMEOUT)
+        if not acquired:
+            logger.warning("Rerank 等待超时（15s），降级为 RRF 排序")
+            return candidates[:top_k]
         try:
             reranker = self._get_reranker()
             passages = [c["content"] for c in candidates]
@@ -131,6 +141,8 @@ class HybridRetriever:
         except Exception as e:
             logger.warning(f"Rerank 失败，降级 RRF 排序: {e}")
             return candidates[:top_k]
+        finally:
+            _rerank_semaphore.release()
 
     def search(self, query: str, top_k: int = TOP_K) -> (List[Dict], Dict):
         """

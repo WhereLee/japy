@@ -104,7 +104,8 @@ async function doAsk() {
   try {
     askAnswer.value = await ragAsk(novelId, askQuestion.value.trim())
   } catch (e: any) {
-    ElMessage.error(e?.message || 'AI 服务暂时不可用')
+    // 拦截器已提示业务错误；此处仅兜底未捕获异常（避免双弹窗）
+    console.error('AI 问答失败:', e)
   } finally {
     asking.value = false
   }
