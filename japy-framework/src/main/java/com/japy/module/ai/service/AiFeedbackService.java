@@ -35,17 +35,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AiFeedbackService {
 
-    private static final String ANALYZE_SYSTEM = """
-            你是 Agent 优化分析师。下面是一段时间内用户对系统监测结果的反馈（含点赞踩、标签、自由文本）。
-            请：1) 聚类同类问题；2) 对每类给出可执行的改进建议（如调整阈值、排除特定场景、补充证据、改进措辞）。
-            严格要求：只输出一个 JSON 对象：{"clusters":[{"title":"问题类标题","count":N,"examples":["反馈原文"],"improvement":"改进建议"}]}
-            """;
-
     private final AiFeedbackMapper feedbackMapper;
     private final AiFeedbackInsightMapper insightMapper;
     private final AiAnalysisLogMapper analysisLogMapper;
     private final MonitorConfig cfg;
     private final LlmClient llmClient;
+    private final AiPromptService promptService;
     private final ObjectMapper objectMapper;
     @Value("${ai.llm.model:deepseek-v4-flash}")
     private String modelName;
@@ -119,7 +114,7 @@ public class AiFeedbackService {
         long start = System.currentTimeMillis();
         String content;
         try {
-            LlmResponse resp = llmClient.chat(ANALYZE_SYSTEM, userPrompt);
+            LlmResponse resp = llmClient.chat(promptService.getContent("feedback_analysis"), userPrompt);
             content = resp.getContent();
             audit.setResponseSummary(truncate(content, 1000));
             audit.setTokenIn(resp.getTokenIn());

@@ -35,12 +35,6 @@ public class AiMonitorService {
 
     /** 去重窗口（分钟）：同指纹在此窗口内不重复插入 */
     private static final long DEDUP_WINDOW_MIN = 30;
-    /** 解读系统提示词（要求 JSON 结构化输出） */
-    private static final String INTERPRET_SYSTEM = """
-            你是系统运维分析顾问。根据检测信号的事实数据，输出一段人话解读。
-            严格要求：只输出一个 JSON 对象，不要输出任何其他内容，格式：
-            {"insight":"用大白话描述发生了什么（2-3句）","rootCause":"可能原因（不确定就写'暂无法确定'）","suggestion":"可执行的建议动作（具体，如涉及参数直接给数值）","confidence":0到1的小数}
-            """;
 
     private final List<Monitor> monitors;
     private final AiMonitorEventMapper eventMapper;
@@ -48,6 +42,7 @@ public class AiMonitorService {
     private final AiAnalysisLogMapper analysisLogMapper;
     private final SysNotificationMapper notificationMapper;
     private final LlmClient llmClient;
+    private final AiPromptService promptService;
     private final ObjectMapper objectMapper;
     @Value("${ai.llm.model:deepseek-v4-flash}")
     private String modelName;
@@ -121,7 +116,7 @@ public class AiMonitorService {
         audit.setModel(modelName);
         long start = System.currentTimeMillis();
         try {
-            LlmResponse resp = llmClient.chat(INTERPRET_SYSTEM, userPrompt);
+            LlmResponse resp = llmClient.chat(promptService.getContent("ops_interpret"), userPrompt);
             audit.setResponseSummary(truncate(resp.getContent(), 1000));
             audit.setTokenIn(resp.getTokenIn());
             audit.setTokenOut(resp.getTokenOut());

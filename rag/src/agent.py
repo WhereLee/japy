@@ -11,6 +11,7 @@ from typing import List, Dict, Generator
 from openai import OpenAI
 
 from config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, LLM_TIMEOUT, logger
+from pg_store import get_active_prompt
 
 # 重试配置
 MAX_RETRIES = 1
@@ -72,7 +73,10 @@ def generate_answer(
     """
     context = build_context(contexts)
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # 提示词注册表：优先读取管理中配置的生效 prompt（保存即生效），无记录回退内置默认
+    system_prompt = get_active_prompt("novel_qa") or SYSTEM_PROMPT
+
+    messages = [{"role": "system", "content": system_prompt}]
 
     # 注入对话历史（最近 10 轮）
     if history:

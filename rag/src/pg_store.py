@@ -150,6 +150,19 @@ def has_index(novel_id: int) -> bool:
         return cur.fetchone()[0] > 0
 
 
+def get_active_prompt(code: str) -> Optional[str]:
+    """读取 LLM 提示词注册表中某场景的当前生效 system prompt（status=1）。
+    供各 LLM 调用点使用：改提示词保存后，下次调用即读到新内容（立即生效）。
+    无记录返回 None，调用方回退内置默认。
+    """
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT system_prompt FROM ai_prompt WHERE code=%s AND status=1 LIMIT 1",
+                    (code,))
+        row = cur.fetchone()
+        return row[0] if row else None
+
+
 def load_indexed_chunks(novel_id: int) -> List[Dict]:
     """读某书全部已向量化块（BM25 语料用），含 id/chapter_no/para_seq/content"""
     with _connect() as conn:

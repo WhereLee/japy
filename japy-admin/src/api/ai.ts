@@ -97,3 +97,27 @@ export function listInsights(params: { page: number; size: number }) {
 export function getFeedbackHint(targetType: string, targetId: number) {
   return request.get('/ai/feedback/hint', { params: { targetType, targetId } })
 }
+
+// LLM 提示词管理（Prompt Registry）
+export interface AiPrompt {
+  id: number
+  code: string
+  name: string
+  systemPrompt: string
+  version: number
+  status: number
+  updatedBy?: number
+  updatedAt?: string
+}
+export function listPrompts() {
+  return request.get<AiPrompt[], AiPrompt[]>('/ai/prompt/list')
+}
+export function listPromptVersions(code: string) {
+  return request.get<AiPrompt[], AiPrompt[]>(`/ai/prompt/${code}/versions`)
+}
+export function updatePrompt(code: string, systemPrompt: string) {
+  return request.put<AiPrompt, AiPrompt>(`/ai/prompt/${code}`, { systemPrompt })
+}
+export function rollbackPrompt(code: string, version: number) {
+  return request.post<AiPrompt, AiPrompt>(`/ai/prompt/${code}/rollback/${version}`)
+}
