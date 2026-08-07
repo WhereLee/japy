@@ -23,3 +23,7 @@ rag/chat.exe
 rag/index/
 rag/logs/
 rag/models/
+
+# Python 编译产物
+__pycache__/
+*.pyc
