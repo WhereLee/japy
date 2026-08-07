@@ -88,6 +88,14 @@ def ask(body: dict):
             "answer": "抱歉，没有检索到与问题相关的片段。",
             "sources": [], "meta": meta}}
 
+    # 检索相关性守卫：rerank 得分（logit）< 0 表示检索结果与问题不相关
+    # （如问编程/通用知识），此时不调用 LLM（省 token + 防答非所问），
+    # 直接给出定位引导。
+    if meta.get("top_score", 0) <= 0:
+        return {"code": 200, "data": {
+            "answer": "我是这本书的问答助手，只讨论与本书相关的内容。请提问本书中的情节、人物或写作手法。",
+            "sources": [], "meta": {**meta, "guarded": True}}}
+
     # 生成（复用 agent.generate_answer，取完整输出）
     # 适配：agent 期望旧字段（chapter_index/chapter_title/chunk_id），新结果用 chapter_no
     agent_chunks = [{
@@ -115,3 +123,8 @@ def ask(body: dict):
 @app.get("/api/rag/status")
 def status(novel_id: int = None):
     return {"code": 200, "data": pg_store.chunk_count(novel_id)}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
