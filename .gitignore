@@ -27,3 +27,6 @@ rag/models/
 # Python 编译产物
 __pycache__/
 *.pyc
+
+# TypeScript 增量编译缓存
+*.tsbuildinfo
