@@ -6,12 +6,15 @@ PG 向量存储层（替代 ChromaDB）：
 连接配置：仓库根 .env 的 JAPY_DB_URL（12-factor，不入库）
 """
 import os
+import logging
 from pathlib import Path
 from typing import List, Dict, Optional
 
 import numpy as np
 import psycopg2
 import psycopg2.extras
+
+logger = logging.getLogger("rag.pg_store")
 
 # 仓库根 .env（与 config.py 同一机制）
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -154,13 +157,18 @@ def get_active_prompt(code: str) -> Optional[str]:
     """读取 LLM 提示词注册表中某场景的当前生效 system prompt（status=1）。
     供各 LLM 调用点使用：改提示词保存后，下次调用即读到新内容（立即生效）。
     无记录返回 None，调用方回退内置默认。
+    异常安全：DB 不可达/表缺失时返回 None（不冒泡），保住调用方的内置兜底降级链。
     """
-    with _connect() as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT system_prompt FROM ai_prompt WHERE code=%s AND status=1 LIMIT 1",
-                    (code,))
-        row = cur.fetchone()
-        return row[0] if row else None
+    try:
+        with _connect() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT system_prompt FROM ai_prompt WHERE code=%s AND status=1 LIMIT 1",
+                        (code,))
+            row = cur.fetchone()
+            return row[0] if row else None
+    except Exception:
+        logger.warning("读取提示词注册表失败（code=%s），回退内置默认", code)
+        return None
 
 
 def load_indexed_chunks(novel_id: int) -> List[Dict]:

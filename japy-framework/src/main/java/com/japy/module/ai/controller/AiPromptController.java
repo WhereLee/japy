@@ -43,6 +43,7 @@ public class AiPromptController {
     @PreAuthorize("@ss.hasPermi('ai:prompt:edit')")
     public R<AiPrompt> update(@PathVariable String code, @RequestBody Map<String, String> body,
                               @AuthenticationPrincipal LoginUser user) {
+        validateCode(code);
         String prompt = body.get("systemPrompt");
         if (prompt == null || prompt.isBlank()) {
             return R.fail("systemPrompt 不能为空");
@@ -55,6 +56,17 @@ public class AiPromptController {
     @PreAuthorize("@ss.hasPermi('ai:prompt:rollback')")
     public R<AiPrompt> rollback(@PathVariable String code, @PathVariable int version,
                                 @AuthenticationPrincipal LoginUser user) {
+        validateCode(code);
+        if (version < 1) {
+            return R.fail("版本号必须 ≥ 1");
+        }
         return R.ok(promptService.rollback(code, version, user == null ? null : user.getUserId()));
+    }
+
+    /** code 边界校验：仅字母数字下划线，≤50 字符（防任意场景注入/超长触发 DB 异常） */
+    private void validateCode(String code) {
+        if (code == null || !code.matches("^[a-zA-Z0-9_]{1,50}$")) {
+            throw new IllegalArgumentException("非法场景标识: " + code);
+        }
     }
 }

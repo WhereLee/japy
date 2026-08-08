@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
@@ -110,9 +112,15 @@ public class AiPromptService {
         return promptMapper.selectVersions(code);
     }
 
-    /** 编辑保存：新内容作为新版本生效，旧版本退役。保存即刷新缓存 → 立即生效 */
+    /** 编辑保存：新内容作为新版本生效，旧版本退役。保存即刷新缓存 → 立即生效。
+     *  并发安全：同 code 写操作经 pg_advisory_xact_lock 串行化（事务级咨询锁，
+     *  事务结束自动释放）——防止并发算出相同版本号撞唯一约束，或 update∥rollback
+     *  并发导致两行 status=1（缓存与 DB 永久不一致）。 */
     @Transactional
     public AiPrompt update(String code, String newPrompt, Long operatorId) {
+        // 同 code 写串行化（PostgreSQL 事务级咨询锁，哈希到 int4 键）
+        promptMapper.lockCode(code);
+
         AiPrompt active = promptMapper.selectActiveByCode(code);
         // 版本号基于该 code 的最大版本（而非当前生效版本）：
         // 否则"回滚后再编辑"会与历史版本撞唯一约束 (code, version)
@@ -136,14 +144,16 @@ public class AiPromptService {
             active.setStatus(0);
             promptMapper.updateById(active);
         }
-        refresh(code, np);
-        log.info("LLM 提示词更新：{} v{} → v{}（操作人 {}）", code, active == null ? 0 : active.getVersion(), nextVersion, operatorId);
+        refreshAfterCommit(code, np);
+        log.info("LLM 提示词更新：{} 新版本 v{}（操作人 {}）", code, nextVersion, operatorId);
         return np;
     }
 
     /** 回滚到指定版本：目标版本置生效，当前生效版本退役。立即生效 */
     @Transactional
     public AiPrompt rollback(String code, int version, Long operatorId) {
+        promptMapper.lockCode(code); // 同 code 写串行化（与 update 互斥）
+
         AiPrompt target = promptMapper.selectOne(new LambdaQueryWrapper<AiPrompt>()
                 .eq(AiPrompt::getCode, code).eq(AiPrompt::getVersion, version));
         if (target == null) {
@@ -159,12 +169,23 @@ public class AiPromptService {
         target.setUpdatedAt(LocalDateTime.now());
         promptMapper.updateById(target);
 
-        refresh(code, target);
+        refreshAfterCommit(code, target);
         log.info("LLM 提示词回滚：{} 回滚到 v{}（操作人 {}）", code, version, operatorId);
         return target;
     }
 
-    private void refresh(String code, AiPrompt active) {
-        activeCache.put(code, active);
+    /** 事务提交后再刷新缓存：回滚（如并发冲突）不会污染缓存；提交前其他线程也读不到半新状态。
+     *  非事务上下文（如测试直接调用无事务方法时）立即刷新。 */
+    private void refreshAfterCommit(String code, AiPrompt active) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    activeCache.put(code, active);
+                }
+            });
+        } else {
+            activeCache.put(code, active);
+        }
     }
 }

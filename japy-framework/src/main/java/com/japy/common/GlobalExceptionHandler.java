@@ -43,6 +43,13 @@ public class GlobalExceptionHandler {
         return R.fail(401, "认证失败：" + e.getMessage());
     }
 
+    /** 业务参数不合法（如回滚不存在的版本、非法场景标识）——明确 400 语义而非吞进 500 */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public R<Void> handleIllegalArgument(IllegalArgumentException e) {
+        log.warn("参数不合法: {}", e.getMessage());
+        return R.fail(400, e.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public R<Void> handleException(Exception e) {
         log.error("系统异常", e);

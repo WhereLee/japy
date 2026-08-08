@@ -71,13 +71,12 @@ class RagApiTest extends AbstractIntegrationTest {
     @Test
     @Order(3)
     void 问答接口降级处理() throws Exception {
-        // RAG 服务可能未启动：应返回降级提示（code 非 200 但 HTTP 200，不 500）
+        // RAG 服务可能未启动：应返回明确提示（code 200 可用 / 400 降级提示），HTTP 200 不 500
         JsonNode r = call(post("/rag/ask")
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")
                 .content("{\"novelId\":1,\"question\":\"晨星号收到了什么？\"}"));
-        // 服务不可用 → code 500（R.fail）；可用 → code 200
-        assertTrue(r.get("code").asInt() == 200 || r.get("code").asInt() == 500,
+        assertTrue(r.get("code").asInt() == 200 || r.get("code").asInt() == 400,
                 "降级应返回明确提示而非异常, code=" + r.get("code"));
     }
 
@@ -89,7 +88,7 @@ class RagApiTest extends AbstractIntegrationTest {
                 .header("Authorization", "Bearer " + token)
                 .contentType("application/json")
                 .content("{\"novel_id\":1}"));
-        assertTrue(r.get("code").asInt() == 200 || r.get("code").asInt() == 500,
+        assertTrue(r.get("code").asInt() == 200 || r.get("code").asInt() == 400,
                 "admin 可调同步，code=" + r.get("code"));
     }
 }

@@ -21,4 +21,9 @@ public interface AiPromptMapper extends BaseMapper<AiPrompt> {
     @Select("SELECT p.* FROM ai_prompt p JOIN (SELECT code, MAX(version) v FROM ai_prompt WHERE status = 1 GROUP BY code) a " +
             "ON p.code = a.code AND p.version = a.v ORDER BY p.code")
     List<AiPrompt> selectAllActive();
+
+    /** 同 code 写串行化：锁住该 code 最新一行（事务级行锁，事务结束自动释放）。
+     *  新场景并发首插（无行可锁）由唯一约束 (code, version) 兜底，不会污染状态。 */
+    @Select("SELECT id FROM ai_prompt WHERE code = #{code} ORDER BY version DESC LIMIT 1 FOR UPDATE")
+    Long lockCode(@Param("code") String code);
 }
