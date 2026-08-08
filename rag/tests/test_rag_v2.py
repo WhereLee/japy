@@ -260,6 +260,31 @@ class TestAskContract:
 
 
 # ---------------------------------------------------------------------------
+# E. 提示词注册表契约（agent 读取数据库 prompt，保存即生效；无记录回退内置）
+# ---------------------------------------------------------------------------
+class TestPromptRegistryContract:
+    def test_uses_db_prompt_when_available(self, monkeypatch):
+        """注册表契约：数据库有生效 prompt 时，system 消息用数据库内容（而非内置）"""
+        fake = FakeOpenAI()
+        monkeypatch.setattr(agent_module, "OpenAI", lambda *a, **k: fake)
+        # 模拟数据库返回自定义提示词
+        monkeypatch.setattr(agent_module, "get_active_prompt", lambda code: "【DB版】你是定制提示词。")
+        list(generate_answer("问题", [{"chunk_id": 1, "content": "片段", "chapter_title": "第一章", "chapter_index": 0}]))
+        msgs = fake.chat.completions.last_kwargs["messages"]
+        assert msgs[0]["role"] == "system"
+        assert msgs[0]["content"] == "【DB版】你是定制提示词。"
+
+    def test_falls_back_to_builtin_when_no_db_record(self, monkeypatch):
+        """注册表契约：数据库无记录时回退内置 SYSTEM_PROMPT（防提示词缺失）"""
+        fake = FakeOpenAI()
+        monkeypatch.setattr(agent_module, "OpenAI", lambda *a, **k: fake)
+        monkeypatch.setattr(agent_module, "get_active_prompt", lambda code: None)
+        list(generate_answer("问题", [{"chunk_id": 1, "content": "片段", "chapter_title": "第一章", "chapter_index": 0}]))
+        msgs = fake.chat.completions.last_kwargs["messages"]
+        assert msgs[0]["content"] == SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
 # D. rag_api 其余接口契约
 # ---------------------------------------------------------------------------
 class TestMiscEndpoints:
