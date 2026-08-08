@@ -27,6 +27,28 @@ RERANKER_ONNX_INT8_PATH = NOVELS_RAW_DIR.parent / "models" / "bge-reranker-v2-m3
 _rerank_semaphore = threading.Semaphore(1)
 RERANK_TIMEOUT = 15  # 等待信号量超时（秒）
 
+# ---------------------------------------------------------------------------
+# 全局单例：Reranker 全进程只加载一份（多书共享，避免每检索器一份 569MB 导致内存爆炸）
+# ORT session 线程安全，int8 权重只读，配合 _rerank_semaphore 并发闸门使用
+# ---------------------------------------------------------------------------
+_reranker = None
+_reranker_tokenizer = None
+_reranker_lock = threading.Lock()
+
+
+def _get_global_reranker():
+    """懒加载 + 双重检查锁的全局 Reranker（tokenizer + 模型）"""
+    global _reranker, _reranker_tokenizer
+    if _reranker is None:
+        with _reranker_lock:
+            if _reranker is None:
+                from optimum.onnxruntime import ORTModelForSequenceClassification
+                from transformers import AutoTokenizer
+                logger.info(f"加载全局 Reranker (ONNX INT8): {RERANKER_ONNX_INT8_PATH}")
+                _reranker_tokenizer = AutoTokenizer.from_pretrained(str(RERANKER_ONNX_INT8_PATH))
+                _reranker = ORTModelForSequenceClassification.from_pretrained(str(RERANKER_ONNX_INT8_PATH))
+    return _reranker, _reranker_tokenizer
+
 logger = logging.getLogger("rag.retriever_pg")
 
 
@@ -58,12 +80,10 @@ class HybridRetriever:
         self._bm25 = BM25Okapi(self._tokenized_corpus)
         logger.info(f"BM25 索引构建完成: {time.perf_counter() - t0:.2f}s")
 
-        # === 4. Embedder（懒加载）===
-        self._embedder: Optional[Embedder] = None
+        # === 4. Embedder（全局共享单例，懒加载）===
+        self._embedder = None
 
-        # === 5. Reranker（懒加载）===
-        self._reranker = None
-        self._reranker_lock = threading.Lock()
+        # === 5. Reranker（全局共享单例，懒加载）===
 
     def _load_chunks_from_pg(self) -> List[Dict]:
         """从 PG 读已向量化检索块"""
@@ -78,20 +98,17 @@ class HybridRetriever:
         return pg_store.load_indexed_chunks(self.novel_id)
 
     def _get_embedder(self) -> Embedder:
+        """向量模型：进程级全局单例（多书共享，避免每书一份 ~100MB）"""
+        from embedder import get_shared_embedder
         if self._embedder is None:
-            self._embedder = Embedder(batch_size=1)
+            self._embedder = get_shared_embedder(batch_size=1)
         return self._embedder
 
     def _get_reranker(self):
-        if self._reranker is None:
-            with self._reranker_lock:
-                if self._reranker is None:
-                    from optimum.onnxruntime import ORTModelForSequenceClassification
-                    from transformers import AutoTokenizer
-                    logger.info(f"加载 Reranker (ONNX INT8): {RERANKER_ONNX_INT8_PATH}")
-                    self._reranker_tokenizer = AutoTokenizer.from_pretrained(str(RERANKER_ONNX_INT8_PATH))
-                    self._reranker = ORTModelForSequenceClassification.from_pretrained(str(RERANKER_ONNX_INT8_PATH))
-        return self._reranker
+        """精排模型：进程级全局单例（多书共享，避免每书一份 569MB）"""
+        reranker, tokenizer = _get_global_reranker()
+        self._reranker_tokenizer = tokenizer
+        return reranker
 
     def _vector_search(self, query: str, top_n: int = VECTOR_TOP_K) -> List[Dict]:
         """向量检索路：query → embedding → pgvector 最近邻 → top_n"""

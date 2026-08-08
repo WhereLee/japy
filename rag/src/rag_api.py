@@ -8,6 +8,8 @@ RAG 服务接口（融入 japy-framework 的独立 API，非流式 JSON）：
 """
 import logging
 import threading
+import time
+from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException
 
@@ -20,17 +22,27 @@ logger = logging.getLogger("rag.api")
 app = FastAPI(title="Japy RAG Service", version="1.0")
 
 # 检索器缓存：novel_id → HybridRetriever（BM25 索引重构建昂贵，缓存复用）
+# LRU 上限：模型已全局单例，缓存只存"书的 BM25 语料索引"；书多了淘汰最久未用的
 _retrievers = {}
 _retriever_lock = threading.Lock()
-# 同步锁：同书互斥
-_sync_locks = {}
+RETRIEVER_CACHE_MAX = 16
 
 
 def _get_retriever(novel_id: int) -> HybridRetriever:
     with _retriever_lock:
-        if novel_id not in _retrievers:
-            _retrievers[novel_id] = HybridRetriever(novel_id)
-        return _retrievers[novel_id]
+        if novel_id in _retrievers:
+            # LRU：命中即移到末尾（dict pop + 重插）
+            r = _retrievers.pop(novel_id)
+            _retrievers[novel_id] = r
+            return r
+        retriever = HybridRetriever(novel_id)
+        _retrievers[novel_id] = retriever
+        # 超限淘汰最久未用（最早插入的）
+        while len(_retrievers) > RETRIEVER_CACHE_MAX:
+            oldest = next(iter(_retrievers))
+            _retrievers.pop(oldest, None)
+            logger.info(f"检索器缓存淘汰 novel {oldest}（LRU，上限 {RETRIEVER_CACHE_MAX}）")
+        return retriever
 
 
 def _invalidate(novel_id: int):
@@ -48,24 +60,116 @@ def sync(body: dict = None):
     body = body or {}
     novel_id = body.get("novel_id")
     if novel_id:
-        # 同书同步互斥（锁用完即清，避免无限增长）
-        lock = _sync_locks.setdefault(novel_id, threading.Lock())
-        try:
-            with lock:
-                try:
-                    result = sync_novel(int(novel_id))
-                except Exception as e:
-                    logger.exception("sync failed")
-                    raise HTTPException(status_code=500, detail=f"同步失败: {e}")
-        finally:
-            _sync_locks.pop(novel_id, None)
-        _invalidate(int(novel_id))
-        return {"code": 200, "data": result}
-    # 全量
-    result = sync_all()
-    for n in result["synced"]:
-        _invalidate(n.get("novel_id"))
-    return {"code": 200, "data": result}
+        novel_id = int(novel_id)
+        # 异步执行：立即返回任务已启动，进度经 /api/rag/sync/status 轮询
+        start_sync_task(novel_id, all_novels=False)
+        return {"code": 200, "data": {"task_started": True, "novel_id": novel_id}}
+    # 全量也异步（避免长 HTTP 阻塞）
+    start_sync_task(None, all_novels=True)
+    return {"code": 200, "data": {"task_started": True, "novel_id": None, "all": True}}
+
+
+# ---------------------------------------------------------------------------
+# 异步同步任务 + 进度状态（切块时间/入库时间/入库进度 信息交互）
+# 任务状态存内存 dict（进程重启丢失可接受；生产可迁 Redis/DB）
+# ---------------------------------------------------------------------------
+_sync_tasks: Dict[int, Dict] = {}       # novel_id(0=全量) → 任务状态
+_task_locks: Dict[int, threading.Lock] = {}  # 同书互斥
+
+
+def _task_state(novel_id: int) -> Dict:
+    key = novel_id if novel_id else 0
+    if key not in _sync_tasks:
+        _sync_tasks[key] = {
+            "novel_id": novel_id, "status": "idle",
+            "phase": "", "processed": 0, "total": 0,
+            "detail": "", "result": None, "error": None,
+            "updated_at": time.strftime("%H:%M:%S"),
+        }
+    return _sync_tasks[key]
+
+
+def _progress_cb(novel_id: int):
+    state = _task_state(novel_id)
+
+    def cb(p: Dict):
+        state["phase"] = p["phase"]
+        state["processed"] = p["processed"]
+        state["total"] = p["total"]
+        state["detail"] = p["detail"]
+        state["updated_at"] = time.strftime("%H:%M:%S")
+    return cb
+
+
+# 同步任务全局串行：同时最多 1 个同步任务（模型单例 + 防多任务并发加载/推理）
+_sync_semaphore = threading.Semaphore(1)
+
+
+def _run_sync(novel_id: int, all_novels: bool):
+    state = _task_state(novel_id)
+    # 全局串行：拿不到信号量则排队等待（同步任务不并发，模型只被一份顺序使用）
+    if not _sync_semaphore.acquire(timeout=60):
+        state["status"] = "failed"
+        state["error"] = "等待同步资源超时（已有其他同步任务在跑）"
+        return
+    try:
+        if all_novels:
+            state["status"] = "running"
+            result = sync_all(progress_cb=_progress_cb(0))
+            state["result"] = result
+            state["status"] = "done"
+            for n in result.get("synced", []):
+                _invalidate(n.get("novel_id"))
+        else:
+            state["status"] = "running"
+            result = sync_novel(novel_id, progress_cb=_progress_cb(novel_id))
+            if "error" in result:
+                state["error"] = result["error"]
+                state["status"] = "failed"
+            else:
+                state["result"] = result
+                state["status"] = "done"
+        state["updated_at"] = time.strftime("%H:%M:%S")
+        if not all_novels:
+            _invalidate(novel_id)
+    except Exception as e:
+        logger.exception("sync task failed")
+        state["status"] = "failed"
+        state["error"] = str(e)
+    finally:
+        _sync_semaphore.release()  # 释放全局串行闸门
+        # 任务结束 10 分钟后清理状态（防无限增长）
+        threading.Timer(600, lambda: _sync_tasks.pop(novel_id if novel_id else 0, None)).start()
+        _task_locks.pop(novel_id if novel_id else 0, None)
+
+
+def start_sync_task(novel_id: Optional[int], all_novels: bool = False):
+    """启动异步同步任务（同书互斥；运行中重复触发直接忽略）"""
+    key = novel_id if novel_id else 0
+    state = _task_state(novel_id)
+    if state["status"] == "running":
+        return
+    lock = _task_locks.setdefault(key, threading.Lock())
+    if lock.locked():
+        return
+    state["status"] = "queued"
+    t = threading.Thread(target=_run_sync, args=(novel_id, all_novels), daemon=True)
+    t.start()
+
+
+@app.get("/api/rag/sync/status")
+def sync_status(novel_id: int = None):
+    """查询同步任务进度：状态/阶段/已处理/总数/分阶段耗时（fetch/chunk/embed/save）"""
+    key = novel_id if novel_id else 0
+    state = _task_state(novel_id)
+    data = {k: state[k] for k in ("novel_id", "status", "phase", "processed", "total", "detail", "updated_at", "error")}
+    if state.get("result"):
+        r = state["result"]
+        data["result"] = r.get("chunks") if isinstance(r, dict) else r
+        data["phases"] = (r or {}).get("phases") if isinstance(r, dict) else None
+        data["elapsed"] = (r or {}).get("elapsed") if isinstance(r, dict) else None
+        data["paragraphs"] = (r or {}).get("paragraphs") if isinstance(r, dict) else None
+    return {"code": 200, "data": data}
 
 
 @app.post("/api/rag/ask")

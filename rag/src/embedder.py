@@ -8,11 +8,14 @@ Embedding 推理模块：ONNX Runtime INT8 量化
 """
 import os
 import queue
+import logging
 import threading
 import time
 import numpy as np
 from pathlib import Path
 from typing import List, Callable, Optional
+
+logger = logging.getLogger("rag.embedder")
 
 # === P 核绑定 ===
 # i5-12500H: 4P + 8E，P 核含超线程 = 8 线程
@@ -23,6 +26,28 @@ from config import PROJECT_ROOT
 
 # ONNX INT8 模型路径
 ONNX_INT8_MODEL_PATH = PROJECT_ROOT / "models" / "bge-base-zh-v1.5-onnx-int8"
+
+# ---------------------------------------------------------------------------
+# 全局单例：向量模型全进程只加载一份（多书共享，避免每书/每任务一份导致内存爆炸）
+# ORT session 线程安全，int8 权重只读，可安全并发调用
+# ---------------------------------------------------------------------------
+_shared_embedder: Optional["Embedder"] = None
+_embedder_lock = threading.Lock()
+
+
+def get_shared_embedder(batch_size: int = 48) -> "Embedder":
+    """获取全局共享的 Embedder 实例（懒加载 + 双重检查锁）。
+
+    查询路径（batch_size=1）与同步路径（batch_size=48）共用一份：
+    查询单条文本不受 batch 影响；同步大 batch 走大块推理。
+    """
+    global _shared_embedder
+    if _shared_embedder is None:
+        with _embedder_lock:
+            if _shared_embedder is None:
+                logger.info("加载全局 Embedder（bge-base-zh int8，单例共享）...")
+                _shared_embedder = Embedder(batch_size=batch_size)
+    return _shared_embedder
 
 
 class Embedder:
@@ -43,21 +68,30 @@ class Embedder:
         self._model = ORTModelForFeatureExtraction.from_pretrained(str(ONNX_INT8_MODEL_PATH))
         self._tokenizer = AutoTokenizer.from_pretrained(str(ONNX_INT8_MODEL_PATH))
 
-    def encode_batch(self, texts: List[str]) -> np.ndarray:
+    def encode_batch(self, texts: List[str], progress_cb=None) -> np.ndarray:
         """
         对一批文本执行推理，返回 embedding 矩阵 (N, 768)。
+        progress_cb(done, total)：按内部批次推进度（向量化耗时大户，用于入库进度展示）。
         """
-        inputs = self._tokenizer(
-            texts, padding=True, truncation=True,
-            max_length=512, return_tensors="np"
-        )
-        outputs = self._model(**{k: v for k, v in inputs.items()})
-        # Mean pooling
-        embeddings = self._mean_pooling(outputs, inputs["attention_mask"])
-        # L2 归一化
-        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-        embeddings = embeddings / np.maximum(norms, 1e-12)
-        return embeddings
+        batch_size = getattr(self, "batch_size", 48)
+        total = len(texts)
+        if total == 0:
+            return np.zeros((0, 768), dtype=np.float32)
+
+        embeddings = []
+        for start in range(0, total, batch_size):
+            batch = texts[start:start + batch_size]
+            inputs = self._tokenizer(
+                batch, padding=True, truncation=True,
+                max_length=512, return_tensors="np"
+            )
+            outputs = self._model(**{k: v for k, v in inputs.items()})
+            emb = self._mean_pooling(outputs, inputs["attention_mask"])
+            norms = np.linalg.norm(emb, axis=1, keepdims=True)
+            embeddings.append(emb / np.maximum(norms, 1e-12))
+            if progress_cb:
+                progress_cb(min(start + len(batch), total), total)
+        return np.vstack(embeddings) if len(embeddings) > 1 else embeddings[0]
 
     def _mean_pooling(self, model_output, attention_mask) -> np.ndarray:
         """Mean pooling over token embeddings"""

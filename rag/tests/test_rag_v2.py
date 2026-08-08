@@ -303,38 +303,68 @@ class TestMiscEndpoints:
         assert r.status_code == 200
         assert r.json()["data"]["count"] == 20
 
-    def test_sync_single_novel_invalidates_cache(self, monkeypatch):
-        """同步契约：同步单本后必须使检索器缓存失效（否则旧索引残留）"""
-        monkeypatch.setattr(rag_api, "sync_novel", lambda nid: {"novel_id": nid, "chunks": 10})
-        monkeypatch.setattr(rag_api, "sync_all", lambda: {"synced": []})
+    def test_sync_starts_async_task(self, monkeypatch):
+        """同步契约（异步版）：触发立即返回 task_started；后台线程执行 sync_novel"""
+        monkeypatch.setattr(rag_api, "sync_novel", lambda nid, progress_cb=None: {"novel_id": nid, "chunks": 10})
+        monkeypatch.setattr(rag_api, "sync_all", lambda progress_cb=None: {"synced": []})
         invalidated = []
         monkeypatch.setattr(rag_api, "_invalidate", lambda nid: invalidated.append(nid))
+        # 清掉可能残留的任务状态
+        rag_api._sync_tasks.pop(2, None)
         r = client.post("/api/rag/sync", json={"novel_id": 2})
         assert r.status_code == 200
-        assert r.json()["data"]["chunks"] == 10
-        assert invalidated == [2]
+        assert r.json()["data"]["task_started"] is True
+        assert r.json()["data"]["novel_id"] == 2
+        # 轮询等待后台任务完成（异步），完成后缓存必须失效
+        assert self._wait_task_done(2), "后台同步任务未在时限内完成"
+        assert invalidated == [2], "同步完成后必须使检索器缓存失效"
 
-    def test_sync_all_invalidates_all(self, monkeypatch):
-        """同步契约：全量同步后所有 synced 书缓存失效"""
-        monkeypatch.setattr(rag_api, "sync_all", lambda: {"synced": [{"novel_id": 1}, {"novel_id": 2}]})
+    def test_sync_all_starts_async_task(self, monkeypatch):
+        """同步契约（异步版）：全量同步后台执行，全部书缓存失效"""
+        monkeypatch.setattr(rag_api, "sync_all", lambda progress_cb=None: {"synced": [{"novel_id": 1}, {"novel_id": 2}]})
         invalidated = []
         monkeypatch.setattr(rag_api, "_invalidate", lambda nid: invalidated.append(nid))
+        rag_api._sync_tasks.pop(0, None)
         r = client.post("/api/rag/sync", json={})
         assert r.status_code == 200
+        assert r.json()["data"]["task_started"] is True
+        assert self._wait_task_done(0), "全量同步任务未在时限内完成"
         assert sorted(invalidated) == [1, 2]
 
-    def test_sync_locks_cleaned_after_success(self, monkeypatch):
-        """锁契约：同步完成后锁必须清理（防内存泄漏与后续死锁）"""
-        monkeypatch.setattr(rag_api, "sync_novel", lambda nid: {"novel_id": nid})
+    def test_sync_task_cleaned_after_success(self, monkeypatch):
+        """任务状态契约：同步成功后任务锁清理（防内存泄漏）"""
+        monkeypatch.setattr(rag_api, "sync_novel", lambda nid, progress_cb=None: {"novel_id": nid})
+        rag_api._sync_tasks.pop(5, None)
         r = client.post("/api/rag/sync", json={"novel_id": 5})
         assert r.status_code == 200
-        assert 5 not in rag_api._sync_locks
+        assert self._wait_task_done(5), "同步任务未完成"
+        assert 5 not in rag_api._task_locks, "任务锁必须清理"
 
-    def test_sync_lock_cleaned_on_failure(self, monkeypatch):
-        """锁契约：同步异常时锁也必须清理（防异常后永久互斥）"""
-        def boom(nid):
+    def test_sync_task_cleaned_on_failure(self, monkeypatch):
+        """任务状态契约：同步异常时任务状态为 failed、锁清理、全局信号量释放"""
+        def boom(nid, progress_cb=None):
             raise RuntimeError("sync failed")
         monkeypatch.setattr(rag_api, "sync_novel", boom)
+        rag_api._sync_tasks.pop(6, None)
         r = client.post("/api/rag/sync", json={"novel_id": 6})
-        assert r.status_code == 500
-        assert 6 not in rag_api._sync_locks
+        assert r.status_code == 200, "异步触发不因任务失败而 500"
+        assert self._wait_task_done(6), "失败任务未结束"
+        assert rag_api._sync_tasks[6]["status"] == "failed"
+        assert "sync failed" in rag_api._sync_tasks[6]["error"]
+        assert 6 not in rag_api._task_locks, "失败后任务锁也必须清理"
+        # 全局信号量必须已释放（可立即再次获取）
+        assert rag_api._sync_semaphore.acquire(timeout=1), "失败后全局信号量必须释放"
+        rag_api._sync_semaphore.release()
+
+    @staticmethod
+    def _wait_task_done(novel_id: int, timeout: float = 5.0) -> bool:
+        """轮询等待异步任务进入终态（done/failed）"""
+        import time
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            key = novel_id if novel_id else 0
+            st = rag_api._sync_tasks.get(key, {}).get("status")
+            if st in ("done", "failed"):
+                return True
+            time.sleep(0.05)
+        return False
