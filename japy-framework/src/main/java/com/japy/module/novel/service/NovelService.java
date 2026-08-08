@@ -175,6 +175,7 @@ public class NovelService {
     @Transactional
     public NovelVO upload(String title, String author, String category, String intro,
                           org.springframework.web.multipart.MultipartFile file) {
+        long t0 = System.currentTimeMillis();
         if (title == null || title.isBlank()) {
             throw new BusinessException("书名不能为空");
         }
@@ -212,8 +213,7 @@ public class NovelService {
 
         // 3. 写章节 + 段落
         for (int i = 0; i < parsed.getChapters().size(); i++) {
-            NovelParserService.Chapter ch = parsed.getChapters().get(i);
-            NovelChapter chapter = new NovelChapter();
+            NovelParserService.Chapter ch = parsed.getChapters().get(i);            NovelChapter chapter = new NovelChapter();
             chapter.setNovelId(novel.getId());
             chapter.setChapterNo(i + 1);
             chapter.setTitle(ch.getTitle());
@@ -240,7 +240,9 @@ public class NovelService {
 
         // 6. 触发 RAG 索引同步（异步事件，不阻塞上传）
         eventPublisher.publishEvent(new com.japy.module.rag.event.NovelUploadedEvent(novel.getId()));
-        return toVO(novel);
+        NovelVO vo = toVO(novel);
+        vo.setUploadElapsedMs(System.currentTimeMillis() - t0);
+        return vo;
     }
 
     /** 状态流转（0上架 1下架 2草稿） */

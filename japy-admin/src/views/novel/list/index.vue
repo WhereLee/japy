@@ -149,7 +149,8 @@ async function onUpload() {
     fd.append('category', form.category.trim())
     fd.append('intro', form.intro.trim())
     const novel = await uploadNovel(fd)
-    ElMessage.success(`《${novel.title}》上传成功：${novel.chapterCount} 章，已自动上架`)
+    const elapsed = novel.uploadElapsedMs != null ? `（解析入库耗时 ${novel.uploadElapsedMs}ms）` : ''
+    ElMessage.success(`《${novel.title}》上传成功：${novel.chapterCount} 章，已自动上架 ${elapsed}`)
     dialog.value = false
     Object.assign(form, { title: '', author: '', category: '', intro: '' })
     if (fileRef.value) fileRef.value.value = ''

@@ -14,4 +14,5 @@ public class NovelVO {
     private Integer status;
     private Integer chapterCount;
     private Long totalChars;
+    private Long uploadElapsedMs;   // 上传解析耗时（切章+统计+入库，毫秒）
 }

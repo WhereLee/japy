@@ -47,10 +47,16 @@ public class RagClient {
         }
     }
 
-    /** 触发同步（单本或全量） */
+    /** 触发同步（单本或全量，异步） */
     public Map<String, Object> sync(Long novelId) {
         Map<String, Object> body = novelId == null ? Map.of() : Map.of("novel_id", novelId);
         return post("/api/rag/sync", body);
+    }
+
+    /** 同步任务进度（异步同步的切块/入库进度 + 分阶段耗时） */
+    public Map<String, Object> syncStatus(Long novelId) {
+        String url = baseUrl + "/api/rag/sync/status" + (novelId == null ? "" : "?novel_id=" + novelId);
+        return get(url);
     }
 
     /** 问答 */

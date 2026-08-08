@@ -66,6 +66,17 @@ public class RagController {
         }
     }
 
+    /** 管理端：同步任务进度（异步切块/入库进度 + 分阶段耗时） */
+    @GetMapping("/admin/rag/sync/status")
+    @PreAuthorize("@ss.hasPermi('rag:list')")
+    public R<Map<String, Object>> syncStatus(@RequestParam(required = false) Long novelId) {
+        try {
+            return R.ok(ragClient.syncStatus(novelId));
+        } catch (RagUnavailableException e) {
+            return R.fail(e.getMessage());
+        }
+    }
+
     /** 探活（管理端展示 RAG 服务状态） */
     @GetMapping("/admin/rag/health")
     @PreAuthorize("@ss.hasPermi('rag:list')")
