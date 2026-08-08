@@ -6,6 +6,9 @@
 """
 import time
 import json
+import re
+import random
+import threading
 from typing import List, Dict, Generator
 
 from openai import OpenAI
@@ -13,9 +16,15 @@ from openai import OpenAI
 from config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, LLM_TIMEOUT, logger
 from pg_store import get_active_prompt
 
-# 重试配置
-MAX_RETRIES = 1
-RETRY_BACKOFF = 3  # 秒
+# 重试配置（指数退避 + 抖动，覆盖 DeepSeek 429/超时）
+MAX_RETRIES = 2
+RETRY_BACKOFF_BASE = 1  # 秒：1s → 2s（指数），再加随机抖动
+RETRY_BACKOFF_JITTER = 0.5
+
+# LLM 并发控制：同时最多 LLM_MAX_CONCURRENT 个生成（多用户同时问书时防 API 限流雪崩）
+LLM_MAX_CONCURRENT = 8
+_llm_sem = threading.Semaphore(LLM_MAX_CONCURRENT)
+LLM_SEM_TIMEOUT = 30  # 排队超时（秒）：超时则降级，不无限等待
 
 SYSTEM_PROMPT = """你是一个对小说有深度理解的对话者。你读过这本书很多遍，不仅记得情节，更能读出文字背后的东西。
 
@@ -103,26 +112,39 @@ def generate_answer(
 
     client = OpenAI(api_key=LLM_API_KEY, base_url=LLM_BASE_URL, timeout=LLM_TIMEOUT)
 
-    # 流式调用（带重试）
+    # 并发闸门：超出 LLM_MAX_CONCURRENT 个并发生成时排队（最多 30s），超时降级原文
+    if not _llm_sem.acquire(timeout=LLM_SEM_TIMEOUT):
+        logger.warning("LLM 并发排队超时（>%s 个并发生成），降级返回原文", LLM_MAX_CONCURRENT)
+        yield "[LLM 繁忙] 以下是检索到的原文片段，供您直接阅读：\n\n"
+        for i, c in enumerate(contexts[:5], 1):
+            yield f"【片段{i}｜{c['chapter_title']}】\n{c['content'][:200]}\n\n"
+        yield "\n__SOURCES__" + json.dumps(build_sources(contexts), ensure_ascii=False)
+        return
+
+    # 流式调用（带重试：指数退避 + 抖动）
     stream = None
     last_error = None
-    for attempt in range(MAX_RETRIES + 1):
-        try:
-            stream = client.chat.completions.create(
-                model=LLM_MODEL,
-                messages=messages,
-                temperature=0.85,
-                max_tokens=4000,
-                stream=True,
-            )
-            break
-        except Exception as e:
-            last_error = e
-            if attempt < MAX_RETRIES:
-                logger.warning(f"LLM API 调用失败 (attempt {attempt+1}): {e}, {RETRY_BACKOFF}s 后重试...")
-                time.sleep(RETRY_BACKOFF)
-            else:
-                logger.error(f"LLM API 调用失败 (已重试{MAX_RETRIES}次): {e}")
+    try:
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                stream = client.chat.completions.create(
+                    model=LLM_MODEL,
+                    messages=messages,
+                    temperature=0.85,
+                    max_tokens=4000,
+                    stream=True,
+                )
+                break
+            except Exception as e:
+                last_error = e
+                if attempt < MAX_RETRIES:
+                    backoff = RETRY_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, RETRY_BACKOFF_JITTER)
+                    logger.warning(f"LLM API 调用失败 (attempt {attempt+1}): {e}, {backoff:.1f}s 后重试...")
+                    time.sleep(backoff)
+                else:
+                    logger.error(f"LLM API 调用失败 (已重试{MAX_RETRIES}次): {e}")
+    finally:
+        _llm_sem.release()
 
     # 重试仍失败 → 降级：返回检索原文
     if stream is None:

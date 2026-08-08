@@ -7,6 +7,7 @@ PG 向量存储层（替代 ChromaDB）：
 """
 import os
 import logging
+import threading
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -29,11 +30,46 @@ if _ENV_FILE.exists():
 DEFAULT_DB_URL = "postgresql://postgres:root@localhost:5432/japy_moments"
 DB_URL = os.getenv("JAPY_DB_URL", DEFAULT_DB_URL)
 
+# ==================== 数据库连接池（多用户并发核心）====================
+# 原实现每请求新建连接：并发峰值 = 请求数 × 3（一次 ask 建 3~4 个连接），无上限。
+# 改为 ThreadedConnectionPool（线程安全）+ 信号量限流：
+#   - min 5 / max 20：常驻 5 条，突发借到 20（PG 每连接 ~10MB，20 条远低于 max_connections=100）
+#   - 信号量 acquire(timeout=5s)：池满时明确报"繁忙"，而不是无限阻塞
+# 用法不变：`with _connect() as conn:` 自动 commit/rollback + 归还连接。
+# =====================================================================
+import psycopg2.pool
+from contextlib import contextmanager
 
+_POOL = None
+_POOL_LOCK = threading.Lock()
+_CONN_SEM = threading.Semaphore(20)
+POOL_TIMEOUT = 5  # 等待空闲连接超时（秒）
+
+
+def _get_pool():
+    global _POOL
+    if _POOL is None:
+        with _POOL_LOCK:
+            if _POOL is None:
+                _POOL = psycopg2.pool.ThreadedConnectionPool(5, 20, DB_URL)
+    return _POOL
+
+
+@contextmanager
 def _connect():
-    conn = psycopg2.connect(DB_URL)
-    conn.autocommit = False
-    return conn
+    """池化连接上下文：acquire 超时明确报错；事务 commit/rollback；finally 归还连接"""
+    if not _CONN_SEM.acquire(timeout=POOL_TIMEOUT):
+        raise TimeoutError("数据库连接池繁忙（并发超过 20），请稍后再试")
+    conn = _get_pool().getconn()
+    try:
+        yield conn
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
+    finally:
+        _get_pool().putconn(conn)
+        _CONN_SEM.release()
 
 
 # ==================== 读取事实源 ====================

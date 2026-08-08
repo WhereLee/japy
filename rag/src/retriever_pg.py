@@ -26,6 +26,13 @@ RERANKER_ONNX_INT8_PATH = NOVELS_RAW_DIR.parent / "models" / "bge-reranker-v2-m3
 # bge-reranker int8 单实例 ~569MB，并发推理会内存暴涨/OOM（与旧 retriever.py 一致）
 _rerank_semaphore = threading.Semaphore(1)
 RERANK_TIMEOUT = 15  # 等待信号量超时（秒）
+RERANK_QUEUE_MAX = 8  # 等待队列上限：超过即明确告知"高峰"，不再静默降级
+_rerank_waiting = 0
+_rerank_waiting_lock = threading.Lock()
+
+
+class RerankBusyError(RuntimeError):
+    """Rerank 排队超限——上层转友好提示（不再静默降级 RRF）"""
 
 # ---------------------------------------------------------------------------
 # 全局单例：Reranker 全进程只加载一份（多书共享，避免每检索器一份 569MB 导致内存爆炸）
@@ -135,13 +142,23 @@ class HybridRetriever:
 
     def _rerank(self, query: str, candidates: List[Dict], top_k: int = TOP_K) -> List[Dict]:
         """Rerank 精排（bge-reranker ONNX INT8，tokenizer → 模型 → logits[:,0]）
-        全局信号量限流：同时最多 1 个 Rerank 操作，超时降级 RRF 序"""
+        全局信号量限流 + 队列上限：
+        - 队列未满：等待信号量（最多 15s），拿到就精排
+        - 队列已满（>8 个请求在等）：抛 RerankBusyError，上层返回友好提示（不静默降级）"""
         if not candidates:
             return []
+        # 队列上限检查（进入等待前登记，防并发涌入）
+        global _rerank_waiting
+        with _rerank_waiting_lock:
+            if _rerank_waiting >= RERANK_QUEUE_MAX:
+                raise RerankBusyError("问答高峰，精排队列已满，请稍后再试")
+            _rerank_waiting += 1
         acquired = _rerank_semaphore.acquire(timeout=RERANK_TIMEOUT)
         if not acquired:
-            logger.warning("Rerank 等待超时（15s），降级为 RRF 排序")
-            return candidates[:top_k]
+            logger.warning("Rerank 等待超时（15s），排队请求过多")
+            with _rerank_waiting_lock:
+                _rerank_waiting -= 1
+            raise RerankBusyError("问答高峰，精排排队超时，请稍后再试")
         try:
             reranker = self._get_reranker()
             passages = [c["content"] for c in candidates]
@@ -155,11 +172,15 @@ class HybridRetriever:
             scored = list(zip(candidates, scores))
             scored.sort(key=lambda x: -x[1])
             return [dict(c, score=float(s)) for c, s in scored[:top_k]]
+        except RerankBusyError:
+            raise  # 排队超限：不吞掉，上层转友好提示
         except Exception as e:
             logger.warning(f"Rerank 失败，降级 RRF 排序: {e}")
             return candidates[:top_k]
         finally:
             _rerank_semaphore.release()
+            with _rerank_waiting_lock:
+                _rerank_waiting -= 1
 
     def search(self, query: str, top_k: int = TOP_K) -> (List[Dict], Dict):
         """

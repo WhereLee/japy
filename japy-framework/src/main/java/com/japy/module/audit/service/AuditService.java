@@ -1,6 +1,7 @@
 package com.japy.module.audit.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.japy.common.BusinessException;
@@ -121,7 +122,10 @@ public class AuditService {
                 new LambdaQueryWrapper<NovelAudit>().eq(NovelAudit::getResult, "PENDING"));
     }
 
-    /** 处理审核：PASS（确认通过）/ TAKEDOWN（下架） */
+    /** 处理审核：PASS（确认通过）/ TAKEDOWN（下架）。
+     *  幂等：条件更新（WHERE result='PENDING'），影响 0 行 = 已被他人处理——
+     *  防双管理员/双击重复处理（读-判-写原子化，无需悲观锁）。 */
+    @org.springframework.transaction.annotation.Transactional
     public NovelAudit handle(Long auditId, String result, Long auditorId, String remark) {
         if (!"PASS".equals(result) && !"TAKEDOWN".equals(result) && !"REJECT".equals(result)) {
             throw new BusinessException("非法处理结果");
@@ -130,14 +134,21 @@ public class AuditService {
         if (audit == null) {
             throw new BusinessException("审核记录不存在");
         }
-        if (!"PENDING".equals(audit.getResult())) {
-            throw new BusinessException("该记录已处理");
+        // 条件更新：仅当仍为 PENDING 时更新；影响 0 行 = 并发下已被处理
+        int updated = auditMapper.update(null, new LambdaUpdateWrapper<NovelAudit>()
+                .eq(NovelAudit::getId, auditId)
+                .eq(NovelAudit::getResult, "PENDING")
+                .set(NovelAudit::getResult, result)
+                .set(NovelAudit::getAuditorId, auditorId)
+                .set(NovelAudit::getAuditTime, LocalDateTime.now())
+                .set(NovelAudit::getRemark, remark));
+        if (updated == 0) {
+            throw new BusinessException("该记录已被处理（请刷新列表）");
         }
         audit.setResult(result);
         audit.setAuditorId(auditorId);
         audit.setAuditTime(LocalDateTime.now());
         audit.setRemark(remark);
-        auditMapper.updateById(audit);
         return audit;
     }
 

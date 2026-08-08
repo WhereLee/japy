@@ -309,13 +309,12 @@ class TestMiscEndpoints:
         monkeypatch.setattr(rag_api, "sync_all", lambda progress_cb=None: {"synced": []})
         invalidated = []
         monkeypatch.setattr(rag_api, "_invalidate", lambda nid: invalidated.append(nid))
-        # 清掉可能残留的任务状态
-        rag_api._sync_tasks.pop(2, None)
+        rag_api._clear_task(2)  # 清残留状态
         r = client.post("/api/rag/sync", json={"novel_id": 2})
         assert r.status_code == 200
         assert r.json()["data"]["task_started"] is True
         assert r.json()["data"]["novel_id"] == 2
-        # 轮询等待后台任务完成（异步），完成后缓存必须失效
+        # 轮询等待后台任务完成（异步，经 Redis 状态），完成后缓存必须失效
         assert self._wait_task_done(2), "后台同步任务未在时限内完成"
         assert invalidated == [2], "同步完成后必须使检索器缓存失效"
 
@@ -324,7 +323,7 @@ class TestMiscEndpoints:
         monkeypatch.setattr(rag_api, "sync_all", lambda progress_cb=None: {"synced": [{"novel_id": 1}, {"novel_id": 2}]})
         invalidated = []
         monkeypatch.setattr(rag_api, "_invalidate", lambda nid: invalidated.append(nid))
-        rag_api._sync_tasks.pop(0, None)
+        rag_api._clear_task(0)
         r = client.post("/api/rag/sync", json={})
         assert r.status_code == 200
         assert r.json()["data"]["task_started"] is True
@@ -332,38 +331,39 @@ class TestMiscEndpoints:
         assert sorted(invalidated) == [1, 2]
 
     def test_sync_task_cleaned_after_success(self, monkeypatch):
-        """任务状态契约：同步成功后任务锁清理（防内存泄漏）"""
+        """任务状态契约：同步成功后分布式锁释放（可再次获取）"""
         monkeypatch.setattr(rag_api, "sync_novel", lambda nid, progress_cb=None: {"novel_id": nid})
-        rag_api._sync_tasks.pop(5, None)
+        rag_api._clear_task(5)
         r = client.post("/api/rag/sync", json={"novel_id": 5})
         assert r.status_code == 200
         assert self._wait_task_done(5), "同步任务未完成"
-        assert 5 not in rag_api._task_locks, "任务锁必须清理"
+        # 锁已释放：可立即获取（成功路径 finally 释放）
+        assert rag_api._acquire_sync_lock(timeout=1), "成功后分布式锁必须已释放"
+        rag_api._release_sync_lock()
 
     def test_sync_task_cleaned_on_failure(self, monkeypatch):
-        """任务状态契约：同步异常时任务状态为 failed、锁清理、全局信号量释放"""
+        """任务状态契约：同步异常时状态 failed、锁释放（Redis 持久化）"""
         def boom(nid, progress_cb=None):
             raise RuntimeError("sync failed")
         monkeypatch.setattr(rag_api, "sync_novel", boom)
-        rag_api._sync_tasks.pop(6, None)
+        rag_api._clear_task(6)
         r = client.post("/api/rag/sync", json={"novel_id": 6})
         assert r.status_code == 200, "异步触发不因任务失败而 500"
         assert self._wait_task_done(6), "失败任务未结束"
-        assert rag_api._sync_tasks[6]["status"] == "failed"
-        assert "sync failed" in rag_api._sync_tasks[6]["error"]
-        assert 6 not in rag_api._task_locks, "失败后任务锁也必须清理"
-        # 全局信号量必须已释放（可立即再次获取）
-        assert rag_api._sync_semaphore.acquire(timeout=1), "失败后全局信号量必须释放"
-        rag_api._sync_semaphore.release()
+        st = rag_api._task_state(6)
+        assert st["status"] == "failed"
+        assert "sync failed" in st["error"]
+        # 失败后分布式锁必须释放（finally 路径）
+        assert rag_api._acquire_sync_lock(timeout=1), "失败后分布式锁必须释放"
+        rag_api._release_sync_lock()
 
     @staticmethod
     def _wait_task_done(novel_id: int, timeout: float = 5.0) -> bool:
-        """轮询等待异步任务进入终态（done/failed）"""
+        """轮询等待异步任务进入终态（done/failed），状态经 Redis 读取"""
         import time
         deadline = time.time() + timeout
         while time.time() < deadline:
-            key = novel_id if novel_id else 0
-            st = rag_api._sync_tasks.get(key, {}).get("status")
+            st = rag_api._task_state(novel_id).get("status")
             if st in ("done", "failed"):
                 return True
             time.sleep(0.05)

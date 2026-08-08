@@ -6,16 +6,19 @@ RAG 服务接口（融入 japy-framework 的独立 API，非流式 JSON）：
 - GET  /api/rag/health     Java 探活
 独立于旧 web_app.py（保留给 rag 自带页面）。
 """
+import json
 import logging
+import os
 import threading
 import time
 from typing import Dict, Optional
 
+import redis
 from fastapi import FastAPI, HTTPException
 
 import pg_store
 from agent import build_context, generate_answer
-from retriever_pg import HybridRetriever
+from retriever_pg import HybridRetriever, RerankBusyError
 from sync_service import sync_novel, sync_all
 
 logger = logging.getLogger("rag.api")
@@ -71,22 +74,45 @@ def sync(body: dict = None):
 
 # ---------------------------------------------------------------------------
 # 异步同步任务 + 进度状态（切块时间/入库时间/入库进度 信息交互）
-# 任务状态存内存 dict（进程重启丢失可接受；生产可迁 Redis/DB）
+# 任务状态存 Redis Hash（多实例共享，进程重启不丢）；互斥用 Redis 分布式锁
+# （SET NX EX，TTL 防死锁）——跨进程/跨实例一致的并发控制。
 # ---------------------------------------------------------------------------
-_sync_tasks: Dict[int, Dict] = {}       # novel_id(0=全量) → 任务状态
-_task_locks: Dict[int, threading.Lock] = {}  # 同书互斥
+_redis = redis.Redis(host=os.getenv("REDIS_HOST", "127.0.0.1"),
+                     port=int(os.getenv("REDIS_PORT", "6379")),
+                     db=int(os.getenv("REDIS_DB", "0")), decode_responses=True)
+
+TASK_HASH_KEY = "rag:sync:task"    # Hash: {novel_id: 状态 JSON}
+LOCK_KEY = "rag:sync:lock"         # 分布式锁（全局串行）
+LOCK_TTL = 300                     # 锁过期（秒）——防任务崩溃死锁
+TASK_TTL = 600                     # 任务状态过期（秒）——自动清理
 
 
 def _task_state(novel_id: int) -> Dict:
-    key = novel_id if novel_id else 0
-    if key not in _sync_tasks:
-        _sync_tasks[key] = {
+    """读任务状态（Redis Hash，无则返回默认 idle 态）"""
+    key = str(novel_id if novel_id else 0)
+    raw = _redis.hget(TASK_HASH_KEY, key)
+    if raw:
+        state = json.loads(raw)
+    else:
+        state = {
             "novel_id": novel_id, "status": "idle",
             "phase": "", "processed": 0, "total": 0,
             "detail": "", "result": None, "error": None,
             "updated_at": time.strftime("%H:%M:%S"),
         }
-    return _sync_tasks[key]
+        _redis.hset(TASK_HASH_KEY, key, json.dumps(state))
+        _redis.expire(TASK_HASH_KEY, TASK_TTL)
+    return state
+
+
+def _save_state(novel_id: int, state: Dict):
+    key = str(novel_id if novel_id else 0)
+    _redis.hset(TASK_HASH_KEY, key, json.dumps(state, ensure_ascii=False))
+    _redis.expire(TASK_HASH_KEY, TASK_TTL)  # 滚动续期，任务结束后 TTL 自动清理
+
+
+def _clear_task(novel_id: int):
+    _redis.hdel(TASK_HASH_KEY, str(novel_id if novel_id else 0))
 
 
 def _progress_cb(novel_id: int):
@@ -98,23 +124,36 @@ def _progress_cb(novel_id: int):
         state["total"] = p["total"]
         state["detail"] = p["detail"]
         state["updated_at"] = time.strftime("%H:%M:%S")
+        _save_state(novel_id, state)
     return cb
 
 
-# 同步任务全局串行：同时最多 1 个同步任务（模型单例 + 防多任务并发加载/推理）
-_sync_semaphore = threading.Semaphore(1)
+def _acquire_sync_lock(timeout: int = 60) -> bool:
+    """Redis 分布式锁（SET NX EX）：跨进程/实例互斥；轮询等待，超时返回 False"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _redis.set(LOCK_KEY, "1", nx=True, ex=LOCK_TTL):
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def _release_sync_lock():
+    _redis.delete(LOCK_KEY)
 
 
 def _run_sync(novel_id: int, all_novels: bool):
     state = _task_state(novel_id)
-    # 全局串行：拿不到信号量则排队等待（同步任务不并发，模型只被一份顺序使用）
-    if not _sync_semaphore.acquire(timeout=60):
+    # 分布式锁：全局串行（跨进程一致），拿不到则等待，超时标记失败
+    if not _acquire_sync_lock():
         state["status"] = "failed"
-        state["error"] = "等待同步资源超时（已有其他同步任务在跑）"
+        state["error"] = "获取同步锁超时（已有其他同步任务在跑）"
+        _save_state(novel_id, state)
         return
     try:
         if all_novels:
             state["status"] = "running"
+            _save_state(novel_id, state)
             result = sync_all(progress_cb=_progress_cb(0))
             state["result"] = result
             state["status"] = "done"
@@ -122,6 +161,7 @@ def _run_sync(novel_id: int, all_novels: bool):
                 _invalidate(n.get("novel_id"))
         else:
             state["status"] = "running"
+            _save_state(novel_id, state)
             result = sync_novel(novel_id, progress_cb=_progress_cb(novel_id))
             if "error" in result:
                 state["error"] = result["error"]
@@ -129,30 +169,26 @@ def _run_sync(novel_id: int, all_novels: bool):
             else:
                 state["result"] = result
                 state["status"] = "done"
-        state["updated_at"] = time.strftime("%H:%M:%S")
-        if not all_novels:
             _invalidate(novel_id)
+        state["updated_at"] = time.strftime("%H:%M:%S")
+        _save_state(novel_id, state)
     except Exception as e:
         logger.exception("sync task failed")
         state["status"] = "failed"
         state["error"] = str(e)
+        _save_state(novel_id, state)
     finally:
-        _sync_semaphore.release()  # 释放全局串行闸门
-        # 任务结束 10 分钟后清理状态（防无限增长）
-        threading.Timer(600, lambda: _sync_tasks.pop(novel_id if novel_id else 0, None)).start()
-        _task_locks.pop(novel_id if novel_id else 0, None)
+        _release_sync_lock()  # 释放分布式锁
+        # 状态由 Redis TTL 自动清理（无需 Timer）
 
 
 def start_sync_task(novel_id: Optional[int], all_novels: bool = False):
-    """启动异步同步任务（同书互斥；运行中重复触发直接忽略）"""
-    key = novel_id if novel_id else 0
+    """启动异步同步任务（运行中重复触发直接忽略）"""
     state = _task_state(novel_id)
-    if state["status"] == "running":
-        return
-    lock = _task_locks.setdefault(key, threading.Lock())
-    if lock.locked():
+    if state["status"] in ("running", "queued"):
         return
     state["status"] = "queued"
+    _save_state(novel_id, state)
     t = threading.Thread(target=_run_sync, args=(novel_id, all_novels), daemon=True)
     t.start()
 
@@ -160,7 +196,6 @@ def start_sync_task(novel_id: Optional[int], all_novels: bool = False):
 @app.get("/api/rag/sync/status")
 def sync_status(novel_id: int = None):
     """查询同步任务进度：状态/阶段/已处理/总数/分阶段耗时（fetch/chunk/embed/save）"""
-    key = novel_id if novel_id else 0
     state = _task_state(novel_id)
     data = {k: state[k] for k in ("novel_id", "status", "phase", "processed", "total", "detail", "updated_at", "error")}
     if state.get("result"):
@@ -185,7 +220,12 @@ def ask(body: dict):
                             detail="该书索引尚未构建，请先在管理端同步")
 
     retriever = _get_retriever(int(novel_id))
-    results, meta = retriever.search(question)
+    try:
+        results, meta = retriever.search(question)
+    except RerankBusyError as e:
+        # 精排排队超限：明确提示高峰期（不静默降级）
+        return {"code": 429, "data": {
+            "answer": str(e), "sources": [], "meta": {"busy": True}}}
 
     if not results:
         return {"code": 200, "data": {
